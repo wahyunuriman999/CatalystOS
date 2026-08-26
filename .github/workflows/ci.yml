@@ -30,20 +30,10 @@ jobs:
         run: |
           cargo check --workspace
 
-      - name: Build Userland Applications
+      - name: Build CatalystOS (Unified Build Script)
         run: |
-          cd userland/hello
-          cargo build --target x86_64-catalyst-user.json
-
-      - name: Build Catalyst Microkernel
-        run: |
-          cd kernel
-          cargo build --target x86_64-catalyst.json
-
-      - name: Generate Bootable Disk Image
-        run: |
-          cd tools/mkimage
-          cargo run
+          chmod +x scripts/build.sh
+          ./scripts/build.sh
 
       - name: Run QEMU Autonomous Verification (Hard Oracle)
         run: |
