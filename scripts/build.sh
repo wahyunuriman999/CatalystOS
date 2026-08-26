@@ -16,12 +16,13 @@ echo "  CatalystOS Deterministic Build System   "
 echo "=========================================="
 
 # 1. Build Userland Programs
-echo "[1/3] Building Userland Programs (hello, sh)..."
-cd "$WORKSPACE_ROOT/userland/hello"
-cargo build --target x86_64-catalyst-user.json
-
-cd "$WORKSPACE_ROOT/userland/sh"
-cargo build --target x86_64-catalyst-user.json
+echo "[1/3] Building Userland Programs (hello, sh, sessiond, displayd, inputd, demo_app, cpkg)..."
+USERLAND_PROJECTS=("hello" "sh" "sessiond" "displayd" "inputd" "demo_app" "cpkg")
+for proj in "${USERLAND_PROJECTS[@]}"; do
+    echo "  -> Building userland/$proj..."
+    cd "$WORKSPACE_ROOT/userland/$proj"
+    cargo build --target x86_64-unknown-none
+done
 
 # 2. Build Microkernel
 echo "[2/3] Building Catalyst Microkernel..."

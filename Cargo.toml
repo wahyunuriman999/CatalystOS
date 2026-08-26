@@ -12,6 +12,11 @@ members = [
     "userland/libcatalyst",
     "userland/hello",
     "userland/sh",
+    "userland/sessiond",
+    "userland/displayd",
+    "userland/inputd",
+    "userland/demo_app",
+    "userland/cpkg",
 ]
 
 [workspace.package]

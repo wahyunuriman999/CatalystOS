@@ -13,19 +13,17 @@ Write-Host "==========================================" -ForegroundColor Cyan
 $WorkspaceRoot = (Get-Item $PSScriptRoot).Parent.FullName
 
 # 1. Build Userland Applications
-Write-Host "`n[1/3] Building Userland Programs (hello, sh)..." -ForegroundColor Yellow
-Push-Location "$WorkspaceRoot\userland\hello"
-try {
-    cargo build --target x86_64-catalyst-user.json
-} finally {
-    Pop-Location
-}
+Write-Host "`n[1/3] Building Userland Programs (hello, sh, sessiond, displayd, inputd, demo_app, cpkg)..." -ForegroundColor Yellow
 
-Push-Location "$WorkspaceRoot\userland\sh"
-try {
-    cargo build --target x86_64-catalyst-user.json
-} finally {
-    Pop-Location
+$UserlandProjects = @("hello", "sh", "sessiond", "displayd", "inputd", "demo_app", "cpkg")
+foreach ($proj in $UserlandProjects) {
+    Write-Host "  -> Building userland/$proj..."
+    Push-Location "$WorkspaceRoot\userland\$proj"
+    try {
+        cargo build --target x86_64-unknown-none
+    } finally {
+        Pop-Location
+    }
 }
 
 # 2. Build Catalyst Microkernel
