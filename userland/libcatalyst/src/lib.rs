@@ -13,12 +13,15 @@ use core::fmt::{self, Write};
 pub const SYS_EXIT: u64          = 1;
 pub const SYS_YIELD: u64         = 2;
 pub const SYS_GETPID: u64        = 4;
+pub const SYS_KILL: u64          = 5;
 pub const SYS_OPEN: u64          = 10;
 pub const SYS_CLOSE: u64         = 11;
 pub const SYS_READ: u64          = 12;
 pub const SYS_WRITE: u64         = 13;
 pub const SYS_MKDIR: u64         = 16;
 pub const SYS_UNLINK: u64        = 17;
+pub const SYS_GETCWD: u64        = 18;
+pub const SYS_CHDIR: u64         = 19;
 pub const SYS_SPAWN: u64         = 30;
 pub const SYS_WAIT: u64          = 31;
 

@@ -17,12 +17,15 @@ use crate::memory::user::{validate_user_buffer, copy_from_user, copy_to_user};
 pub const SYS_EXIT: u64          = 1;
 pub const SYS_YIELD: u64         = 2;
 pub const SYS_GETPID: u64        = 4;
+pub const SYS_KILL: u64          = 5;
 pub const SYS_OPEN: u64          = 10;
 pub const SYS_CLOSE: u64         = 11;
 pub const SYS_READ: u64          = 12;
 pub const SYS_WRITE: u64         = 13;
 pub const SYS_MKDIR: u64         = 16;
 pub const SYS_UNLINK: u64        = 17;
+pub const SYS_GETCWD: u64        = 18;
+pub const SYS_CHDIR: u64         = 19;
 pub const SYS_IPC_CREATE_EP: u64 = 20;
 pub const SYS_IPC_DESTROY_EP: u64= 21;
 pub const SYS_IPC_SEND: u64      = 24;
@@ -277,6 +280,17 @@ extern "C" fn syscall_handler(sys_no: u64, arg1: u64, arg2: u64, arg3: u64, _arg
             }
             u64::MAX
         }
+        SYS_KILL => {
+            let target_pid = arg1;
+            let mut sched = crate::task::scheduler::SCHEDULER.lock();
+            for task in sched.tasks.iter_mut() {
+                if task.process.pid == target_pid {
+                    task.state = crate::task::process::TaskState::Dead;
+                    return 0;
+                }
+            }
+            u64::MAX
+        }
         SYS_WAIT => {
             let target_pid = arg1;
             let sched = crate::task::scheduler::SCHEDULER.lock();
@@ -288,6 +302,38 @@ extern "C" fn syscall_handler(sys_no: u64, arg1: u64, arg2: u64, arg3: u64, _arg
             } else {
                 0
             }
+        }
+        SYS_GETCWD => {
+            let ptr = arg1 as *mut u8;
+            let len = arg2 as usize;
+            if let Err(_) = validate_user_buffer(arg1, len) {
+                return u64::MAX;
+            }
+            let cwd_bytes = b"/";
+            if len < cwd_bytes.len() {
+                return u64::MAX;
+            }
+            if copy_to_user(cwd_bytes, ptr).is_ok() {
+                return cwd_bytes.len() as u64;
+            }
+            u64::MAX
+        }
+        SYS_CHDIR => {
+            let path_ptr = arg1 as *const u8;
+            let path_len = arg2 as usize;
+            if let Err(_) = validate_user_buffer(arg1, path_len) {
+                return u64::MAX;
+            }
+            let mut path_buf = alloc::vec![0u8; path_len];
+            if copy_from_user(path_ptr, &mut path_buf).is_err() {
+                return u64::MAX;
+            }
+            if let Ok(path_str) = core::str::from_utf8(&path_buf) {
+                if vfs_open(path_str, 0).is_ok() {
+                    return 0;
+                }
+            }
+            u64::MAX
         }
         _ => {
             crate::kprintln!("[SYSCALL] Unknown syscall: {}", sys_no);
