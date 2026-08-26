@@ -214,6 +214,40 @@ extern "C" fn syscall_handler(sys_no: u64, arg1: u64, arg2: u64, arg3: u64, _arg
             }
             u64::MAX
         }
+        SYS_MKDIR => {
+            let path_ptr = arg1 as *const u8;
+            let path_len = arg2 as usize;
+            if let Err(_) = validate_user_buffer(arg1, path_len) {
+                return u64::MAX;
+            }
+            let mut path_buf = alloc::vec![0u8; path_len];
+            if copy_from_user(path_ptr, &mut path_buf).is_err() {
+                return u64::MAX;
+            }
+            if let Ok(path_str) = core::str::from_utf8(&path_buf) {
+                if vfs_mkdir(path_str).is_ok() {
+                    return 0;
+                }
+            }
+            u64::MAX
+        }
+        SYS_UNLINK => {
+            let path_ptr = arg1 as *const u8;
+            let path_len = arg2 as usize;
+            if let Err(_) = validate_user_buffer(arg1, path_len) {
+                return u64::MAX;
+            }
+            let mut path_buf = alloc::vec![0u8; path_len];
+            if copy_from_user(path_ptr, &mut path_buf).is_err() {
+                return u64::MAX;
+            }
+            if let Ok(path_str) = core::str::from_utf8(&path_buf) {
+                if vfs_unlink(path_str).is_ok() {
+                    return 0;
+                }
+            }
+            u64::MAX
+        }
         _ => {
             crate::kprintln!("[SYSCALL] Unknown syscall: {}", sys_no);
             u64::MAX

@@ -11,6 +11,7 @@ members = [
     "kernel",
     "userland/libcatalyst",
     "userland/hello",
+    "userland/sh",
 ]
 
 [workspace.package]

@@ -20,6 +20,12 @@ pub const SYS_WRITE: u64         = 13;
 pub const SYS_MKDIR: u64         = 16;
 pub const SYS_UNLINK: u64        = 17;
 
+pub const O_RDONLY: u32 = 0;
+pub const O_WRONLY: u32 = 1;
+pub const O_RDWR: u32   = 2;
+pub const O_CREAT: u32  = 0x40;
+pub const O_TRUNC: u32  = 0x200;
+
 #[inline(always)]
 pub unsafe fn syscall3(no: u64, arg1: u64, arg2: u64, arg3: u64) -> u64 {
     let ret: u64;
@@ -34,6 +40,11 @@ pub unsafe fn syscall3(no: u64, arg1: u64, arg2: u64, arg3: u64) -> u64 {
         options(nostack, preserves_flags)
     );
     ret
+}
+
+#[inline(always)]
+pub unsafe fn syscall2(no: u64, arg1: u64, arg2: u64) -> u64 {
+    syscall3(no, arg1, arg2, 0)
 }
 
 #[inline(always)]
@@ -91,6 +102,28 @@ pub fn open(path: &str, flags: u32) -> Result<usize, ()> {
 pub fn close(fd: usize) -> Result<(), ()> {
     let ret = unsafe {
         syscall1(SYS_CLOSE, fd as u64)
+    };
+    if ret == 0 {
+        Ok(())
+    } else {
+        Err(())
+    }
+}
+
+pub fn mkdir(path: &str) -> Result<(), ()> {
+    let ret = unsafe {
+        syscall2(SYS_MKDIR, path.as_ptr() as u64, path.len() as u64)
+    };
+    if ret == 0 {
+        Ok(())
+    } else {
+        Err(())
+    }
+}
+
+pub fn unlink(path: &str) -> Result<(), ()> {
+    let ret = unsafe {
+        syscall2(SYS_UNLINK, path.as_ptr() as u64, path.len() as u64)
     };
     if ret == 0 {
         Ok(())

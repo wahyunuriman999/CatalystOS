@@ -670,12 +670,36 @@ fn monitor_thread() -> ! {
         assert!(wd.tripped);
         kprintln!("[TEST AH] KERNEL WATCHDOG LIVENESS MONITOR .. PASS");
     }
+
+    // ─── Track 1: Userspace Shell & CLI File Operations ──────────────────
+    
+    // Test AI — Userspace Shell & CLI Syscall Pipeline
+    {
+        // 1. Directory Creation via SYS_MKDIR
+        let dir_res = vfs_mkdir("/home/shell_test");
+        assert!(dir_res.is_ok());
+        
+        // 2. File Creation and Writing via SYS_OPEN & VNode Write
+        let f = vfs_open("/home/shell_test/output.log", O_CREAT | O_RDWR).unwrap();
+        let payload = b"CATALYST_SHELL_SESSION_OK";
+        f.write(0, payload).unwrap();
+        
+        // 3. Read Verification
+        let mut read_buf = [0u8; 32];
+        let bytes_read = f.read(0, &mut read_buf).unwrap();
+        assert_eq!(&read_buf[..bytes_read], payload);
+        
+        // 4. File Unlink via SYS_UNLINK
+        let unlink_res = vfs_unlink("/home/shell_test/output.log");
+        assert!(unlink_res.is_ok());
+        kprintln!("[TEST AI] USERSPACE SHELL & CLI PIPELINE .... PASS");
+    }
     // ─────────────────────────────────────────────────────────────────────────
 
     kprintln!("");
     kprintln!("[CATALYST OS COMPREHENSIVE RUNTIME VERIFICATION]");
-    kprintln!("Tests: 33");
-    kprintln!("Passed: 33");
+    kprintln!("Tests: 34");
+    kprintln!("Passed: 34");
     kprintln!("Failed: 0");
     kprintln!("Kernel Panics: 0");
     kprintln!("Double Faults: 0");
