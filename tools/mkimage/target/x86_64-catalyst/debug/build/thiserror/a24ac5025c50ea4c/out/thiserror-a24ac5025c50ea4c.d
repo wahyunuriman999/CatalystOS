@@ -1,9 +1,0 @@
-C:\Users\ROG G532 LV\.gemini\antigravity\scratch\catalyst-os\tools\mkimage\target\x86_64-catalyst\debug\build\thiserror/a24ac5025c50ea4c\out\thiserror-a24ac5025c50ea4c.d: C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-1.0.69\src\lib.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-1.0.69\src\aserror.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-1.0.69\src\display.rs
-
-C:\Users\ROG G532 LV\.gemini\antigravity\scratch\catalyst-os\tools\mkimage\target\x86_64-catalyst\debug\build\thiserror/a24ac5025c50ea4c\out\libthiserror-a24ac5025c50ea4c.rlib: C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-1.0.69\src\lib.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-1.0.69\src\aserror.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-1.0.69\src\display.rs
-
-C:\Users\ROG G532 LV\.gemini\antigravity\scratch\catalyst-os\tools\mkimage\target\x86_64-catalyst\debug\build\thiserror/a24ac5025c50ea4c\out\libthiserror-a24ac5025c50ea4c.rmeta: C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-1.0.69\src\lib.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-1.0.69\src\aserror.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-1.0.69\src\display.rs
-
-C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-1.0.69\src\lib.rs:
-C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-1.0.69\src\aserror.rs:
-C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\thiserror-1.0.69\src\display.rs:

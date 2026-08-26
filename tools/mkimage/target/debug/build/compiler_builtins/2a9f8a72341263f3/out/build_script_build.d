@@ -1,6 +1,0 @@
-C:\Users\ROG G532 LV\.gemini\antigravity\scratch\catalyst-os\tools/mkimage/target\debug\build\compiler_builtins/2a9f8a72341263f3\out\build_script_build.d: C:\Users\ROG\ G532\ LV\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\compiler-builtins\compiler-builtins\build.rs C:\Users\ROG\ G532\ LV\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\compiler-builtins\compiler-builtins\..\libm\configure.rs
-
-C:\Users\ROG G532 LV\.gemini\antigravity\scratch\catalyst-os\tools/mkimage/target\debug\build\compiler_builtins/2a9f8a72341263f3\out\build_script_build.exe: C:\Users\ROG\ G532\ LV\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\compiler-builtins\compiler-builtins\build.rs C:\Users\ROG\ G532\ LV\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\compiler-builtins\compiler-builtins\..\libm\configure.rs
-
-C:\Users\ROG\ G532\ LV\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\compiler-builtins\compiler-builtins\build.rs:
-C:\Users\ROG\ G532\ LV\.rustup\toolchains\nightly-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\compiler-builtins\compiler-builtins\..\libm\configure.rs:
