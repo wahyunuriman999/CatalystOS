@@ -18,6 +18,7 @@ pub mod events;
 pub mod input;
 pub mod test_harness;
 pub mod ipc;
+pub mod storage;
 
 use bootloader_api::{entry_point, BootInfo};
 
@@ -57,6 +58,8 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     
     crate::kprintln!("Initializing architecture (GDT, IDT, PICs)...");
     arch::init();
+
+    storage::init();
     
     crate::kprintln!("---------- M6: Catalyst GUI Desktop ----------");
     if let Some(info) = fb_info {

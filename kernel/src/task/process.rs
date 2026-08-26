@@ -39,6 +39,7 @@ pub struct Process {
     pub capabilities: Mutex<crate::ipc::CapabilityTable>,
     // Endpoints owned by this process (so we can destroy them on exit)
     pub owned_endpoints: Mutex<alloc::vec::Vec<EndpointId>>,
+    pub files: Mutex<crate::storage::vfs::FileDescriptorTable>,
 }
 
 impl Process {
@@ -48,6 +49,7 @@ impl Process {
             address_space: Some(Arc::new(AddressSpace::new().unwrap())),
             capabilities: Mutex::new(crate::ipc::CapabilityTable::new(pid)),
             owned_endpoints: Mutex::new(alloc::vec::Vec::new()),
+            files: Mutex::new(crate::storage::vfs::FileDescriptorTable::new()),
         }
     }
 }
@@ -63,6 +65,7 @@ impl Drop for Process {
         
         // At this point, endpoints are closed and waiters woken.
         // Capabilities held by this process are automatically destroyed when `self.capabilities` drops.
+        // File descriptors are automatically closed when `self.files` drops.
         crate::kprintln!("[PROCESS] PID {} died, resources cleaned up", self.pid);
     }
 }
@@ -85,6 +88,7 @@ impl Task {
             address_space: None, // Kernel task
             capabilities: Mutex::new(crate::ipc::CapabilityTable::new(0)),
             owned_endpoints: Mutex::new(alloc::vec::Vec::new()),
+            files: Mutex::new(crate::storage::vfs::FileDescriptorTable::new()),
         });
         Task {
             tid: 0,
@@ -107,6 +111,7 @@ impl Task {
             address_space: None,
             capabilities: Mutex::new(crate::ipc::CapabilityTable::new(pid)),
             owned_endpoints: Mutex::new(alloc::vec::Vec::new()),
+            files: Mutex::new(crate::storage::vfs::FileDescriptorTable::new()),
         });
 
         let stack_base = stack.0.as_mut_ptr() as usize;

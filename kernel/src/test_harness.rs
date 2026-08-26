@@ -11,6 +11,9 @@ use crate::ipc::{
     cap_send, cap_receive, cap_call, cap_reply,
     EndpointId
 };
+use crate::storage::vfs::{vfs_open, vfs_mkdir, vfs_unlink, O_RDWR, O_CREAT, VfsError};
+use crate::storage::block::{BlockDevice, RamDisk, BlockError};
+use crate::memory::user::{validate_user_buffer, MemoryError};
 
 static TEST_FRAMES: AtomicUsize = AtomicUsize::new(0);
 
@@ -389,12 +392,83 @@ fn monitor_thread() -> ! {
         assert_eq!(result.unwrap_err(), CapError::EndpointClosed);
         kprintln!("[TEST V] PROCESS DEATH ENDPOINT RECLAMATION . PASS");
     }
+
+    // ─── Phase 5: Memory Management + VFS ────────────────────────────────
+    
+    // Test W — VFS File Creation & Read/Write
+    {
+        let file = vfs_open("/tmp/catalyst_test.txt", O_CREAT | O_RDWR).unwrap();
+        let data = b"CatalystOS VFS Foundation";
+        let written = file.write(0, data).unwrap();
+        assert_eq!(written, data.len());
+        
+        let mut read_buf = [0u8; 32];
+        let bytes_read = file.read(0, &mut read_buf).unwrap();
+        assert_eq!(bytes_read, data.len());
+        assert_eq!(&read_buf[..bytes_read], data);
+        kprintln!("[TEST W] VFS FILE CREATION & READ/WRITE ..... PASS");
+    }
+
+    // Test X — VFS Directory Traversal & Unlink
+    {
+        vfs_mkdir("/tmp/sub_dir").unwrap();
+        let file = vfs_open("/tmp/sub_dir/inner.log", O_CREAT | O_RDWR).unwrap();
+        file.write(0, b"log data").unwrap();
+        
+        // Traverse /tmp/sub_dir
+        let dir = vfs_open("/tmp/sub_dir", 0).unwrap();
+        let entries = dir.readdir().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].name, "inner.log");
+        
+        // Unlink file
+        vfs_unlink("/tmp/sub_dir/inner.log").unwrap();
+        let entries_after = dir.readdir().unwrap();
+        assert_eq!(entries_after.len(), 0);
+        kprintln!("[TEST X] VFS DIRECTORY TRAVERSAL & UNLINK ... PASS");
+    }
+
+    // Test Y — User Memory Boundary Protection
+    {
+        // Valid user pointer
+        assert!(validate_user_buffer(0x0000_1000_0000, 4096).is_ok());
+        
+        // Kernel address violation
+        let result = validate_user_buffer(0xFFFF_8000_0000_0000, 4096);
+        assert_eq!(result.unwrap_err(), MemoryError::KernelAddressAccessViolation);
+        
+        // Null pointer rejection
+        let null_result = validate_user_buffer(0x0, 64);
+        assert_eq!(null_result.unwrap_err(), MemoryError::KernelAddressAccessViolation);
+        kprintln!("[TEST Y] USER MEMORY BOUNDARY PROTECTION .... PASS");
+    }
+
+    // Test Z — Block Device Subsystem (RamDisk)
+    {
+        let disk = RamDisk::new(64, 512);
+        assert_eq!(disk.total_blocks(), 64);
+        assert_eq!(disk.block_size(), 512);
+        
+        let mut write_block = [0xA5u8; 512];
+        write_block[0] = 0x42;
+        disk.write_block(10, &write_block).unwrap();
+        
+        let mut read_block = [0u8; 512];
+        disk.read_block(10, &mut read_block).unwrap();
+        assert_eq!(read_block[0], 0x42);
+        assert_eq!(read_block[511], 0xA5);
+        
+        // Out of bounds block access
+        let oob = disk.read_block(65, &mut read_block);
+        assert_eq!(oob.unwrap_err(), BlockError::OutOfBounds);
+        kprintln!("[TEST Z] BLOCK DEVICE & RAMDISK SUBSYSTEM ... PASS");
+    }
     // ─────────────────────────────────────────────────────────────────────────
 
     kprintln!("");
-    kprintln!("[PHASE 3+4 RUNTIME VERIFICATION]");
-    kprintln!("Tests: 21");
-    kprintln!("Passed: 21");
+    kprintln!("[PHASE 3+4+5 RUNTIME VERIFICATION]");
+    kprintln!("Tests: 25");
+    kprintln!("Passed: 25");
     kprintln!("Failed: 0");
     kprintln!("Kernel Panics: 0");
     kprintln!("Double Faults: 0");
