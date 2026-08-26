@@ -1,0 +1,42 @@
+# ==========================================
+# AEGIS COGNITIVE RUNTIME PLATFORM
+# PROPRIETARY AND CONFIDENTIAL
+# Copyright (c) 2024-2026 Wahyu Nur Iman.
+# All rights reserved.
+# ==========================================
+
+$ErrorActionPreference = "Stop"
+Write-Host "==========================================" -ForegroundColor Cyan
+Write-Host "  CatalystOS Deterministic Build System  " -ForegroundColor Cyan
+Write-Host "==========================================" -ForegroundColor Cyan
+
+$WorkspaceRoot = (Get-Item $PSScriptRoot).Parent.FullName
+
+# 1. Build Userland Applications
+Write-Host "`n[1/3] Building Userland Programs..." -ForegroundColor Yellow
+Push-Location "$WorkspaceRoot\userland\hello"
+try {
+    cargo build --target x86_64-catalyst-user.json
+} finally {
+    Pop-Location
+}
+
+# 2. Build Catalyst Microkernel
+Write-Host "`n[2/3] Building Catalyst Microkernel..." -ForegroundColor Yellow
+Push-Location "$WorkspaceRoot\kernel"
+try {
+    cargo build --target x86_64-catalyst.json
+} finally {
+    Pop-Location
+}
+
+# 3. Create Bootable Disk Image
+Write-Host "`n[3/3] Generating Bootable BIOS Disk Image..." -ForegroundColor Yellow
+Push-Location "$WorkspaceRoot\tools\mkimage"
+try {
+    cargo run
+} finally {
+    Pop-Location
+}
+
+Write-Host "`n>>> CatalystOS Build Complete: target/x86_64-catalyst/debug/catalyst-kernel.img" -ForegroundColor Green

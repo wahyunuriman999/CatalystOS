@@ -1,0 +1,122 @@
+name: CatalystOS Product CI & QEMU Runtime Verification
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-verify:
+    name: Build & QEMU Runtime Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install System Dependencies (QEMU)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86
+
+      - name: Setup Rust Nightly Toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src, llvm-tools-preview
+
+      - name: Workspace Static Check
+        run: |
+          cargo check --workspace
+
+      - name: Build Userland Applications
+        run: |
+          cd userland/hello
+          cargo build --target x86_64-catalyst-user.json
+
+      - name: Build Catalyst Microkernel
+        run: |
+          cd kernel
+          cargo build --target x86_64-catalyst.json
+
+      - name: Generate Bootable Disk Image
+        run: |
+          cd tools/mkimage
+          cargo run
+
+      - name: Run QEMU Autonomous Verification (Hard Oracle)
+        run: |
+          echo "Starting CatalystOS in QEMU..."
+          # Run QEMU with 30s timeout and output piped to log
+          timeout 30s qemu-system-x86_64 \
+            -drive format=raw,file=target/x86_64-catalyst/debug/catalyst-kernel.img \
+            -m 256M \
+            -serial file:qemu_output.log \
+            -display none \
+            -no-reboot || true
+
+          echo "=========================================="
+          echo "         QEMU SERIAL OUTPUT LOG           "
+          echo "=========================================="
+          cat qemu_output.log || true
+          echo "=========================================="
+
+          # Independent Test Oracle Verification (Hard Invariant Enforcement)
+          python3 -c '
+          import sys
+
+          with open("qemu_output.log", "r", errors="ignore") as f:
+              log = f.read()
+
+          required_markers = [
+              "CATALYST OS COMPREHENSIVE RUNTIME VERIFICATION",
+              "Tests: 33",
+              "Passed: 33",
+              "Failed: 0",
+              "Kernel Panics: 0",
+              "Double Faults: 0",
+              "Triple Faults: 0",
+              "RUNTIME EVIDENCE PASS",
+              "FINAL"
+          ]
+
+          missing = [m for m in required_markers if m not in log]
+          if missing:
+              print(f"CI RUNTIME VERIFICATION FAILED: Missing required markers: {missing}")
+              sys.exit(1)
+
+          forbidden_indicators = [
+              "PANIC in",
+              "EXCEPTION: DOUBLE FAULT",
+              "EXCEPTION: PAGE FAULT",
+              "Triple Fault",
+              "FAILED"
+          ]
+
+          # Note: "FAILED: 0" is allowed, but individual test failure markers are forbidden
+          for line in log.splitlines():
+              if "FAILED" in line and "Failed: 0" not in line:
+                  print(f"CI RUNTIME VERIFICATION FAILED on line: {line}")
+                  sys.exit(1)
+              if "PANIC in" in line:
+                  print(f"CI RUNTIME VERIFICATION FAILED: Kernel panic detected: {line}")
+                  sys.exit(1)
+
+          print(">>> CI RUNTIME ORACLE: ALL 33 RUNTIME TESTS PASSED WITH ZERO FAULTS <<<")
+          sys.exit(0)
+          '
+
+      - name: Upload Serial Output Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: catalyst-serial-log
+          path: qemu_output.log
+
+      - name: Upload Bootable Disk Image
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: catalyst-disk-image
+          path: target/x86_64-catalyst/debug/catalyst-kernel.img
