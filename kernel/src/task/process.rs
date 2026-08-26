@@ -36,6 +36,9 @@ pub struct TaskStack(pub [u8; STACK_SIZE]);
 pub struct Process {
     pub pid: u64,
     pub address_space: Option<Arc<AddressSpace>>,
+    pub capabilities: Mutex<crate::ipc::CapabilityTable>,
+    // Endpoints owned by this process (so we can destroy them on exit)
+    pub owned_endpoints: Mutex<alloc::vec::Vec<EndpointId>>,
 }
 
 impl Process {
@@ -43,7 +46,24 @@ impl Process {
         Process {
             pid,
             address_space: Some(Arc::new(AddressSpace::new().unwrap())),
+            capabilities: Mutex::new(crate::ipc::CapabilityTable::new(pid)),
+            owned_endpoints: Mutex::new(alloc::vec::Vec::new()),
         }
+    }
+}
+
+impl Drop for Process {
+    fn drop(&mut self) {
+        // Destroy all owned endpoints (C8, C14)
+        let mut ipc = crate::ipc::IPC_REGISTRY.lock();
+        let endpoints = self.owned_endpoints.lock();
+        for &ep_id in endpoints.iter() {
+            let _ = ipc.destroy_endpoint(ep_id);
+        }
+        
+        // At this point, endpoints are closed and waiters woken.
+        // Capabilities held by this process are automatically destroyed when `self.capabilities` drops.
+        crate::kprintln!("[PROCESS] PID {} died, resources cleaned up", self.pid);
     }
 }
 
@@ -63,6 +83,8 @@ impl Task {
         let process = Arc::new(Process {
             pid: 0,
             address_space: None, // Kernel task
+            capabilities: Mutex::new(crate::ipc::CapabilityTable::new(0)),
+            owned_endpoints: Mutex::new(alloc::vec::Vec::new()),
         });
         Task {
             tid: 0,
@@ -79,9 +101,12 @@ impl Task {
         let tid = NEXT_TID.fetch_add(1, Ordering::Relaxed);
         let mut stack = alloc::boxed::Box::new(TaskStack([0u8; STACK_SIZE]));
         
+        let pid = NEXT_PID.fetch_add(1, Ordering::Relaxed);
         let process = Arc::new(Process {
-            pid: NEXT_PID.fetch_add(1, Ordering::Relaxed),
+            pid,
             address_space: None,
+            capabilities: Mutex::new(crate::ipc::CapabilityTable::new(pid)),
+            owned_endpoints: Mutex::new(alloc::vec::Vec::new()),
         });
 
         let stack_base = stack.0.as_mut_ptr() as usize;

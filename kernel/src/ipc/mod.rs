@@ -25,10 +25,11 @@ pub struct Message {
     pub sender: u64, // Process ID of sender
     pub length: usize,
     pub data: [u8; MAX_MESSAGE_SIZE],
+    pub reply_endpoint: Option<EndpointId>,
 }
 
 impl Message {
-    pub fn new(sender: u64, payload: &[u8]) -> Option<Self> {
+    pub fn new(sender: u64, payload: &[u8], reply_endpoint: Option<EndpointId>) -> Option<Self> {
         if payload.len() > MAX_MESSAGE_SIZE {
             return None;
         }
@@ -38,6 +39,7 @@ impl Message {
             sender,
             length: payload.len(),
             data,
+            reply_endpoint,
         })
     }
 }
@@ -200,7 +202,7 @@ pub fn cap_send(
     let endpoint_id = table.validate(handle, CAP_SEND)?;
 
     // Guard 5: Construct bounded message (C2 — enforced in Message::new)
-    let msg = Message::new(sender_pid, payload)
+    let msg = Message::new(sender_pid, payload, None)
         .ok_or(CapError::IpcError)?;
 
     // Guard 6: Send through IPC core (C1, C3 — endpoint state + queue depth)
@@ -228,4 +230,53 @@ pub fn cap_receive(
             Err(_) => return Err(CapError::IpcError),
         }
     }
+}
+
+/// Phase 4B: Synchronous Call semantics (RPC).
+/// Sends a request and blocks atomically waiting for a reply on an ephemeral reply endpoint.
+pub fn cap_call(
+    table: &mut CapabilityTable,
+    handle: CapabilityHandle,
+    payload: &[u8],
+    caller_pid: u64,
+) -> Result<Message, CapError> {
+    let target_ep = table.validate(handle, CAP_CALL)?;
+    
+    // Create ephemeral reply endpoint owned by caller
+    let reply_ep = IPC_REGISTRY.lock().create_endpoint(caller_pid)
+        .map_err(|_| CapError::IpcError)?;
+    
+    // Grant receive capability on reply endpoint to caller
+    let reply_handle = table.grant(reply_ep, CAP_RECEIVE);
+    
+    // Send message with reply endpoint attached
+    let msg = Message::new(caller_pid, payload, Some(reply_ep))
+        .ok_or(CapError::IpcError)?;
+        
+    if let Err(e) = IPC_REGISTRY.lock().send(target_ep, msg) {
+        let _ = table.revoke(reply_handle);
+        let _ = IPC_REGISTRY.lock().destroy_endpoint(reply_ep);
+        return Err(if e == "Endpoint is closed" { CapError::EndpointClosed } else { CapError::IpcError });
+    }
+    
+    // Wait for reply on the ephemeral endpoint
+    let reply_result = cap_receive(table, reply_handle);
+    
+    // Cleanup ephemeral reply endpoint and revoke handle
+    let _ = table.revoke(reply_handle);
+    let _ = IPC_REGISTRY.lock().destroy_endpoint(reply_ep);
+    
+    reply_result
+}
+
+/// Phase 4B: Reply to a received message's reply endpoint.
+pub fn cap_reply(
+    reply_ep: EndpointId,
+    payload: &[u8],
+    responder_pid: u64,
+) -> Result<(), CapError> {
+    let msg = Message::new(responder_pid, payload, None)
+        .ok_or(CapError::IpcError)?;
+    IPC_REGISTRY.lock().send(reply_ep, msg)
+        .map_err(|e| if e == "Endpoint is closed" { CapError::EndpointClosed } else { CapError::IpcError })
 }

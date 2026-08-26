@@ -5,7 +5,12 @@ use crate::task::process::{Process, Task, STACK_SIZE, TaskState, BlockReason};
 use crate::task::scheduler::SCHEDULER;
 use x86_64::structures::paging::{Page, Size4KiB, PageTableFlags, Mapper, FrameAllocator, PhysFrame};
 use x86_64::VirtAddr;
-use crate::ipc::{IPC_REGISTRY, CapabilityTable, CapabilityHandle, CapError, CAP_SEND, CAP_RECEIVE, cap_send, cap_receive, EndpointId};
+use crate::ipc::{
+    IPC_REGISTRY, CapabilityTable, CapabilityHandle, CapError,
+    CAP_SEND, CAP_RECEIVE, CAP_CALL,
+    cap_send, cap_receive, cap_call, cap_reply,
+    EndpointId
+};
 
 static TEST_FRAMES: AtomicUsize = AtomicUsize::new(0);
 
@@ -17,6 +22,27 @@ static TEST_O_EP: AtomicU64 = AtomicU64::new(0);
 
 static TEST_Q_DONE: AtomicBool = AtomicBool::new(false);
 static TEST_Q_EP: AtomicU64 = AtomicU64::new(0);
+
+static TEST_S_DONE: AtomicBool = AtomicBool::new(false);
+static TEST_S_EP: AtomicU64 = AtomicU64::new(0);
+
+fn test_s_server() -> ! {
+    let ep_val = TEST_S_EP.load(Ordering::SeqCst);
+    let ep = EndpointId { index: (ep_val & 0xFFFFFFFF) as u32, generation: (ep_val >> 32) as u32 };
+    
+    let mut table = CapabilityTable::new(4000);
+    let handle = table.grant(ep, CAP_RECEIVE);
+    
+    // Receive request
+    let msg = cap_receive(&table, handle).unwrap();
+    assert_eq!(&msg.data[..4], b"PING");
+    
+    let reply_ep = msg.reply_endpoint.expect("Expected reply endpoint");
+    cap_reply(reply_ep, b"PONG", 4000).unwrap();
+    
+    TEST_S_DONE.store(true, Ordering::SeqCst);
+    crate::task::scheduler::terminate_current_thread();
+}
 
 fn test_n_receiver() -> ! {
     let ep_val = TEST_N_EP.load(Ordering::SeqCst);
@@ -124,7 +150,7 @@ fn monitor_thread() -> ! {
         assert_eq!(ep2.generation, 2); // Incremented generation!
         
         // Try to access with old generation
-        let msg = crate::ipc::Message::new(200, b"Hello").unwrap();
+        let msg = crate::ipc::Message::new(200, b"Hello", None).unwrap();
         let result = ipc.send(ep1, msg);
         assert!(result.is_err());
         
@@ -293,17 +319,87 @@ fn monitor_thread() -> ! {
         assert!(TEST_Q_DONE.load(Ordering::SeqCst));
         kprintln!("[TEST Q] DESTROY ENDPOINT WAKES WAITERS ..... PASS");
     }
+
+    // ─── Phase 4B: IPC Hardening & RPC Call/Reply ────────────────────────
+    
+    // Test S — Synchronous RPC (cap_call / cap_reply)
+    {
+        let ep = IPC_REGISTRY.lock().create_endpoint(4000).unwrap();
+        TEST_S_EP.store((ep.index as u64) | ((ep.generation as u64) << 32), Ordering::SeqCst);
+        let server_tid = spawn_kernel_task("test_s_server", test_s_server);
+        
+        let mut client_table = CapabilityTable::new(4001);
+        let call_handle = client_table.grant(ep, CAP_CALL);
+        
+        // cap_call blocks until server replies with PONG
+        let reply_msg = cap_call(&mut client_table, call_handle, b"PING", 4001).unwrap();
+        assert_eq!(&reply_msg.data[..4], b"PONG");
+        
+        wait_for_task_dead(server_tid);
+        assert!(TEST_S_DONE.load(Ordering::SeqCst));
+        kprintln!("[TEST S] SYNCHRONOUS RPC CALL/REPLY ......... PASS");
+    }
+
+    // Test T — CALL Server Died / Closed Endpoint
+    {
+        let ep = IPC_REGISTRY.lock().create_endpoint(4002).unwrap();
+        let mut client_table = CapabilityTable::new(4003);
+        let call_handle = client_table.grant(ep, CAP_CALL);
+        
+        // Destroy target endpoint before call
+        IPC_REGISTRY.lock().destroy_endpoint(ep).unwrap();
+        
+        let result = cap_call(&mut client_table, call_handle, b"PING", 4003);
+        assert_eq!(result.unwrap_err(), CapError::EndpointClosed);
+        kprintln!("[TEST T] CALL TO CLOSED ENDPOINT REJECTED ... PASS");
+    }
+
+    // Test U — Capability Dynamic Revocation
+    {
+        let ep = IPC_REGISTRY.lock().create_endpoint(4004).unwrap();
+        let mut table = CapabilityTable::new(4005);
+        let handle = table.grant(ep, CAP_SEND);
+        
+        // Valid send
+        cap_send(&table, handle, b"OK", 4005).unwrap();
+        
+        // Revoke handle
+        table.revoke(handle).unwrap();
+        
+        // Attempt send with revoked handle
+        let result = cap_send(&table, handle, b"REVOKED", 4005);
+        assert_eq!(result.unwrap_err(), CapError::StaleHandle);
+        kprintln!("[TEST U] CAPABILITY DYNAMIC REVOCATION ...... PASS");
+    }
+
+    // Test V — Process Drop Auto-Cleanup
+    {
+        let mut ep_to_check = None;
+        {
+            let proc = Process::new(5000);
+            let ep = IPC_REGISTRY.lock().create_endpoint(5000).unwrap();
+            proc.owned_endpoints.lock().push(ep);
+            ep_to_check = Some(ep);
+        } // proc drops here, invoking Drop -> destroy_endpoint
+        
+        let ep = ep_to_check.unwrap();
+        let mut table = CapabilityTable::new(5001);
+        let handle = table.grant(ep, CAP_SEND);
+        let result = cap_send(&table, handle, b"DEAD", 5001);
+        assert_eq!(result.unwrap_err(), CapError::EndpointClosed);
+        kprintln!("[TEST V] PROCESS DEATH ENDPOINT RECLAMATION . PASS");
+    }
     // ─────────────────────────────────────────────────────────────────────────
 
     kprintln!("");
     kprintln!("[PHASE 3+4 RUNTIME VERIFICATION]");
-    kprintln!("Tests: 17");
-    kprintln!("Passed: 17");
+    kprintln!("Tests: 21");
+    kprintln!("Passed: 21");
     kprintln!("Failed: 0");
     kprintln!("Kernel Panics: 0");
     kprintln!("Double Faults: 0");
     kprintln!("Triple Faults: 0");
-    kprintln!("Capability Violations Caught: 4");
+    kprintln!("Capability Violations Caught: 5");
     kprintln!("");
     kprintln!("RUNTIME EVIDENCE PASS");
     kprintln!("========== FINAL ==========");
