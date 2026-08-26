@@ -5,8 +5,11 @@
 // All rights reserved.
 // ==========================================
 
+pub mod capability;
+
 use alloc::collections::VecDeque;
 use spin::Mutex;
+pub use capability::{CapabilityHandle, CapabilityTable, CapError, CAP_SEND, CAP_RECEIVE, CAP_CALL};
 
 pub const MAX_MESSAGE_SIZE: usize = 256;
 pub const MAX_QUEUE_DEPTH: usize = 64;
@@ -153,3 +156,41 @@ impl EndpointRegistry {
 }
 
 pub static IPC_REGISTRY: Mutex<EndpointRegistry> = Mutex::new(EndpointRegistry::new());
+
+// ─── Capability-Validated Syscall Boundary ───────────────────────────────────
+// These are the ONLY entry points for IPC operations from userspace.
+// Raw EndpointId is NEVER accepted from userspace.
+// Validation order (C4, C5, C12): Handle → Generation → Rights → Endpoint → IPC Core
+
+/// Capability-validated send.
+/// Userspace presents CapabilityHandle; kernel resolves to EndpointId internally.
+pub fn cap_send(
+    table: &CapabilityTable,
+    handle: CapabilityHandle,
+    payload: &[u8],
+    sender_pid: u64,
+) -> Result<(), CapError> {
+    // Guard 1–4: validate handle, generation, rights (C4, C5, C12)
+    let endpoint_id = table.validate(handle, CAP_SEND)?;
+
+    // Guard 5: Construct bounded message (C2 — enforced in Message::new)
+    let msg = Message::new(sender_pid, payload)
+        .ok_or(CapError::IpcError)?;
+
+    // Guard 6: Send through IPC core (C1, C3 — endpoint state + queue depth)
+    IPC_REGISTRY.lock().send(endpoint_id, msg)
+        .map_err(|_| CapError::IpcError)
+}
+
+/// Capability-validated receive.
+pub fn cap_receive(
+    table: &CapabilityTable,
+    handle: CapabilityHandle,
+) -> Result<Message, CapError> {
+    // Guard 1–4: validate handle, generation, rights (C4, C5, C12)
+    let endpoint_id = table.validate(handle, CAP_RECEIVE)?;
+
+    // Receive through IPC core
+    IPC_REGISTRY.lock().receive(endpoint_id)
+        .map_err(|_| CapError::IpcError)
+}
