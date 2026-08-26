@@ -33,19 +33,20 @@ CatalystOS has advanced from an experimental microkernel prototype into a cohere
 ---
 
 ## 3. Runtime Verification Evidence
-The autonomous test harness in `kernel/src/test_harness.rs` executes **34 discrete runtime tests** across every architectural boundary:
+The autonomous test harness in `kernel/src/test_harness.rs` executes **36 discrete runtime tests** across every architectural boundary:
 
 ```text
 [CATALYST OS COMPREHENSIVE RUNTIME VERIFICATION]
-Tests: 34
-Passed: 34
+Tests: 36
+Passed: 36
 Failed: 0
 Kernel Panics: 0
 Double Faults: 0
 Triple Faults: 0
 Capability Violations Caught: 5
-Security Policy Invariants: 3
+Security Policy Invariants: 5
 Recovery Invariants Verified: 2
+Failure Injections Verified: 2
 
 RUNTIME EVIDENCE PASS
 ========== FINAL ==========

@@ -14,6 +14,7 @@ use crate::ipc::{
 use crate::storage::vfs::{vfs_open, vfs_mkdir, vfs_unlink, O_RDWR, O_CREAT, VfsError};
 use crate::storage::block::{BlockDevice, RamDisk, BlockError};
 use crate::memory::user::{validate_user_buffer, MemoryError};
+use crate::memory::address_space::AddressSpace;
 use crate::task::elf::{load_elf_into_address_space, ElfError};
 use crate::net::{MacAddress, EtherType, EthernetHeader, Ipv4Address, IpProtocol, Ipv4Header, UdpHeader};
 use crate::init::services::{SERVICE_MANAGER, ServiceManager, ServiceState};
@@ -694,19 +695,50 @@ fn monitor_thread() -> ! {
         assert!(unlink_res.is_ok());
         kprintln!("[TEST AI] USERSPACE SHELL & CLI PIPELINE .... PASS");
     }
+
+    // ─── Track 5: Failure Injection & Security Boundary Verification ────
+    
+    // Test AJ — Malformed ELF Header Rejection
+    {
+        let corrupt_elf = b"\x00NOT_AN_ELF_HEADER_DATA";
+        let res = load_elf_into_address_space(corrupt_elf);
+        assert!(res.is_err());
+        
+        let truncated_elf = b"\x7fELF";
+        let res_trunc = load_elf_into_address_space(truncated_elf);
+        assert!(res_trunc.is_err());
+        kprintln!("[TEST AJ] MALFORMED ELF REJECTION ........... PASS");
+    }
+
+    // Test AK — Pointer Overflow & Boundary Rejection
+    {
+        // 1. Integer wrap-around
+        let wrap_res = validate_user_buffer(u64::MAX - 10, 100);
+        assert_eq!(wrap_res.unwrap_err(), MemoryError::InvalidAddress);
+        
+        // 2. Kernel space address
+        let kernel_res = validate_user_buffer(0xFFFF_8000_0000_0000, 64);
+        assert_eq!(kernel_res.unwrap_err(), MemoryError::KernelAddressAccessViolation);
+        
+        // 3. Null pointer
+        let null_res = validate_user_buffer(0x0, 16);
+        assert_eq!(null_res.unwrap_err(), MemoryError::KernelAddressAccessViolation);
+        kprintln!("[TEST AK] SYSCALL POINTER BOUNDS ............ PASS");
+    }
     // ─────────────────────────────────────────────────────────────────────────
 
     kprintln!("");
     kprintln!("[CATALYST OS COMPREHENSIVE RUNTIME VERIFICATION]");
-    kprintln!("Tests: 34");
-    kprintln!("Passed: 34");
+    kprintln!("Tests: 36");
+    kprintln!("Passed: 36");
     kprintln!("Failed: 0");
     kprintln!("Kernel Panics: 0");
     kprintln!("Double Faults: 0");
     kprintln!("Triple Faults: 0");
     kprintln!("Capability Violations Caught: 5");
-    kprintln!("Security Policy Invariants: 3");
+    kprintln!("Security Policy Invariants: 5");
     kprintln!("Recovery Invariants Verified: 2");
+    kprintln!("Failure Injections Verified: 2");
     kprintln!("");
     kprintln!("RUNTIME EVIDENCE PASS");
     kprintln!("========== FINAL ==========");

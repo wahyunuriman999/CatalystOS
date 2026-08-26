@@ -16,7 +16,7 @@ use crate::memory::address_space::AddressSpace;
 pub const USER_STACK_TOP: u64 = 0x0000_7FFF_0000_0000;
 pub const USER_STACK_SIZE: usize = 65536; // 64 KiB
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ElfError {
     InvalidMagic,
     Not64Bit,
@@ -25,6 +25,7 @@ pub enum ElfError {
     MappingError(&'static str),
 }
 
+#[derive(Debug, Clone)]
 pub struct LoadedProgram {
     pub entry_point: u64,
     pub user_stack_top: u64,
