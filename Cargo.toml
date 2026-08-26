@@ -9,6 +9,8 @@
 resolver = "2"
 members = [
     "kernel",
+    "userland/libcatalyst",
+    "userland/hello",
 ]
 
 [workspace.package]
