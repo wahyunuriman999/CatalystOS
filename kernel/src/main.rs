@@ -17,6 +17,7 @@ pub mod graphics;
 pub mod events;
 pub mod input;
 pub mod test_harness;
+pub mod ipc;
 
 use bootloader_api::{entry_point, BootInfo};
 

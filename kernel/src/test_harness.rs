@@ -55,8 +55,33 @@ fn monitor_thread() -> ! {
         kprintln!("[TEST G] FRAME RECLAMATION ........ PASS (Start: {}, End: {})", start_frames, end_frames);
     }
 
+    // Phase 4 Tick 10: IPC Core Generation Test
+    {
+        let mut ipc = crate::ipc::IPC_REGISTRY.lock();
+        let ep1 = ipc.create_endpoint(100).unwrap();
+        assert_eq!(ep1.index, 0);
+        assert_eq!(ep1.generation, 1);
+        
+        ipc.destroy_endpoint(ep1).unwrap();
+        
+        let ep2 = ipc.create_endpoint(101).unwrap();
+        assert_eq!(ep2.index, 0); // Reused index
+        assert_eq!(ep2.generation, 2); // Incremented generation!
+        
+        // Try to access with old generation
+        let msg = crate::ipc::Message::new(200, b"Hello").unwrap();
+        let result = ipc.send(ep1, msg);
+        assert!(result.is_err());
+        
+        let result = ipc.send(ep2, msg);
+        assert!(result.is_ok());
+        
+        kprintln!("[TEST I] IPC GENERATIONAL IDENTITY .. PASS");
+    }
+
     // Test H: Scheduler Survival
     kprintln!("[TEST H] SCHEDULER SURVIVAL ........ PASS");
+
     
     kprintln!("");
     kprintln!("[PHASE 3 RUNTIME VERIFICATION]");
