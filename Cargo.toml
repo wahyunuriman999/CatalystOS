@@ -1,0 +1,27 @@
+# ==========================================
+# AEGIS COGNITIVE RUNTIME PLATFORM
+# PROPRIETARY AND CONFIDENTIAL
+# Copyright (c) 2024-2026 Wahyu Nur Iman. 
+# All rights reserved.
+# ==========================================
+
+[workspace]
+resolver = "2"
+members = [
+    "kernel",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+authors = ["Wahyu Nur Iman"]
+license = "Proprietary"
+description = "Catalyst OS — Efficient by default. Responsive by design. Power when you need it."
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+opt-level = 2

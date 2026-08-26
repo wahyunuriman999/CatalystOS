@@ -1,0 +1,21 @@
+# ==========================================
+# AEGIS COGNITIVE RUNTIME PLATFORM
+# PROPRIETARY AND CONFIDENTIAL
+# Copyright (c) 2024-2026 Wahyu Nur Iman. 
+# All rights reserved.
+# ==========================================
+
+[package]
+name = "catalyst-boot"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Catalyst OS Boot Image Builder — creates bootable disk image"
+
+[[bin]]
+name = "catalyst-boot"
+path = "src/main.rs"
+
+[dependencies]
+bootloader = { version = "0.11", features = ["uefi"] }

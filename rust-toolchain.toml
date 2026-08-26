@@ -1,0 +1,11 @@
+# ==========================================
+# AEGIS COGNITIVE RUNTIME PLATFORM
+# PROPRIETARY AND CONFIDENTIAL
+# Copyright (c) 2024-2026 Wahyu Nur Iman. 
+# All rights reserved.
+# ==========================================
+
+[toolchain]
+channel = "nightly"
+components = ["rust-src", "llvm-tools", "rustfmt", "clippy"]
+targets = ["x86_64-unknown-none"]

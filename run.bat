@@ -1,0 +1,1 @@
+"C:\Users\ROG G532 LV\.gemini\antigravity\scratch\qemu\qemu-system-x86_64.exe" -drive "format=raw,file=C:\Users\ROG G532 LV\.gemini\antigravity\scratch\catalyst-os\target\x86_64-catalyst\debug\catalyst-kernel.img" -m 256M -serial stdio -display none -no-reboot -no-shutdown > boot.log 2>&1

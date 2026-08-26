@@ -1,0 +1,35 @@
+name: Catalyst OS QEMU Runtime Tests
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install QEMU
+      run: sudo apt-get update && sudo apt-get install -y qemu-system-x86
+    - name: Install Rust
+      run: |
+        rustup toolchain install nightly --profile minimal
+        rustup component add rust-src llvm-tools-preview --toolchain nightly
+        rustup default nightly
+    - name: Install bootimage
+      run: cargo install bootimage
+    - name: Run Tests
+      run: |
+        cargo bootimage --manifest-path kernel/Cargo.toml
+        timeout 30 qemu-system-x86_64 -drive format=raw,file=target/x86_64-catalyst/debug/bootimage-catalyst-kernel.bin -serial stdio -display none | tee qemu_output.log || true
+        if grep -q "RUNTIME EVIDENCE PASS" qemu_output.log; then
+          echo "Tests PASSED"
+          exit 0
+        else
+          echo "Tests FAILED or TIMED OUT"
+          exit 1
+        fi
+        
+    - name: Upload Logs
+      uses: actions/upload-artifact@v3
+      with:
+        name: qemu-logs
+        path: qemu_output.log

@@ -1,0 +1,10 @@
+[package]
+name = "catalyst-mkimage"
+version = "0.0.1"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+bootloader = "0.11"
+serde = "=1.0.218"

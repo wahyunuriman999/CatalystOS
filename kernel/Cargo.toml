@@ -1,0 +1,32 @@
+# ==========================================
+# AEGIS COGNITIVE RUNTIME PLATFORM
+# PROPRIETARY AND CONFIDENTIAL
+# Copyright (c) 2024-2026 Wahyu Nur Iman. 
+# All rights reserved.
+# ==========================================
+
+[package]
+name = "catalyst-kernel"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Catalyst OS Kernel — Modular Microkernel (provisional) for x86_64"
+
+[dependencies]
+spin = "0.9"
+uart_16550 = "0.3"
+x86_64 = "0.15"
+bootloader_api = "0.11"
+linked_list_allocator = "0.10.2"
+pic8259 = "0.11"
+pc-keyboard = "0.7"
+lazy_static = { version = "1.5", features = ["spin_no_std"] }
+log = "0.4"
+noto-sans-mono-bitmap = "0.3.0"
+xmas-elf = "0.9.1"
+
+[package.metadata.bootloader]
+minimum-framebuffer-height = 720
+minimum-framebuffer-width = 1280
+

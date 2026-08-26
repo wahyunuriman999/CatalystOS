@@ -1,0 +1,22 @@
+# ==========================================
+# AEGIS COGNITIVE RUNTIME PLATFORM
+# PROPRIETARY AND CONFIDENTIAL
+# Copyright (c) 2024-2026 Wahyu Nur Iman. 
+# All rights reserved.
+# ==========================================
+
+# NOTE: build-std and custom target apply workspace-wide.
+# The boot crate must be built separately with:
+#   cargo run -p catalyst-boot --target x86_64-pc-windows-msvc
+
+[unstable]
+build-std = ["core", "compiler_builtins", "alloc"]
+build-std-features = ["compiler-builtins-mem"]
+json-target-spec = true
+
+[build]
+target = "x86_64-catalyst.json"
+
+[target.'cfg(target_os = "none")']
+runner = "powershell -File tools/run-qemu.ps1"
+

@@ -1,0 +1,3 @@
+# Override parent workspace config — this is a host binary, no custom target
+[build]
+# Use default host target
