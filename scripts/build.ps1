@@ -23,20 +23,29 @@ try {
 
 # 2. Build Catalyst Microkernel
 Write-Host "`n[2/3] Building Catalyst Microkernel..." -ForegroundColor Yellow
-Push-Location "$WorkspaceRoot\kernel"
+Push-Location "$WorkspaceRoot"
 try {
-    cargo build --target x86_64-catalyst.json
+    cargo build -p catalyst-kernel --target "$WorkspaceRoot\x86_64-catalyst.json"
 } finally {
     Pop-Location
 }
 
 # 3. Create Bootable Disk Image
 Write-Host "`n[3/3] Generating Bootable BIOS Disk Image..." -ForegroundColor Yellow
-Push-Location "$WorkspaceRoot\tools\mkimage"
-try {
-    cargo run
-} finally {
-    Pop-Location
+if (Test-Path "$WorkspaceRoot\..\catalyst-mkimage") {
+    Push-Location "$WorkspaceRoot\..\catalyst-mkimage"
+    try {
+        cargo run
+    } finally {
+        Pop-Location
+    }
+} elseif (Test-Path "$WorkspaceRoot\tools\mkimage") {
+    Push-Location "$WorkspaceRoot\tools\mkimage"
+    try {
+        cargo run --target x86_64-pc-windows-msvc
+    } finally {
+        Pop-Location
+    }
 }
 
 Write-Host "`n>>> CatalystOS Build Complete: target/x86_64-catalyst/debug/catalyst-kernel.img" -ForegroundColor Green

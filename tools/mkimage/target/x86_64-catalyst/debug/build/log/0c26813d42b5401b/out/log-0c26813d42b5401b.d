@@ -1,0 +1,10 @@
+C:\Users\ROG G532 LV\.gemini\antigravity\scratch\catalyst-os\tools/mkimage/target\x86_64-catalyst\debug\build\log/0c26813d42b5401b\out\log-0c26813d42b5401b.d: C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\lib.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\macros.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\serde.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\__private_api.rs
+
+C:\Users\ROG G532 LV\.gemini\antigravity\scratch\catalyst-os\tools/mkimage/target\x86_64-catalyst\debug\build\log/0c26813d42b5401b\out\liblog-0c26813d42b5401b.rlib: C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\lib.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\macros.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\serde.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\__private_api.rs
+
+C:\Users\ROG G532 LV\.gemini\antigravity\scratch\catalyst-os\tools/mkimage/target\x86_64-catalyst\debug\build\log/0c26813d42b5401b\out\liblog-0c26813d42b5401b.rmeta: C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\lib.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\macros.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\serde.rs C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\__private_api.rs
+
+C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\lib.rs:
+C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\macros.rs:
+C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\serde.rs:
+C:\Users\ROG\ G532\ LV\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\log-0.4.34\src\__private_api.rs:

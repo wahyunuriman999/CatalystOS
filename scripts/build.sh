@@ -22,12 +22,12 @@ cargo build --target x86_64-catalyst-user.json
 
 # 2. Build Microkernel
 echo "[2/3] Building Catalyst Microkernel..."
-cd "$WORKSPACE_ROOT/kernel"
-cargo build --target x86_64-catalyst.json
+cd "$WORKSPACE_ROOT"
+cargo build -p catalyst-kernel --target "$WORKSPACE_ROOT/x86_64-catalyst.json"
 
 # 3. Create Bootable Disk Image
 echo "[3/3] Generating Bootable BIOS Disk Image..."
-cd "$WORKSPACE_ROOT/tools/mkimage"
-cargo run
+cd "$WORKSPACE_ROOT"
+cargo run --manifest-path "$WORKSPACE_ROOT/tools/mkimage/Cargo.toml" --target-dir "$WORKSPACE_ROOT/tools/mkimage/target"
 
 echo ">>> CatalystOS Build Complete: target/x86_64-catalyst/debug/catalyst-kernel.img"
