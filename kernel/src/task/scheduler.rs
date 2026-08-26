@@ -45,6 +45,27 @@ impl Scheduler {
         false
     }
 
+    pub fn current_tid(&self) -> Option<u64> {
+        self.tasks.front().map(|t| t.tid)
+    }
+
+    pub fn block_current(&mut self, reason: crate::task::process::BlockReason) {
+        if let Some(front) = self.tasks.front_mut() {
+            front.state = TaskState::Blocked(reason);
+        }
+    }
+
+    pub fn wake_task(&mut self, tid: u64) {
+        for task in self.tasks.iter_mut() {
+            if task.tid == tid {
+                if let TaskState::Blocked(_) = task.state {
+                    task.state = TaskState::Ready;
+                }
+                break;
+            }
+        }
+    }
+
     /// Round-robin: rotate to the next Ready task.
     /// Returns (old_sp_ptr, new_sp, cr3_opt, kernel_stack_top) or None if only one task.
     pub fn next_task(&mut self) -> Option<(u64, u64, Option<x86_64::structures::paging::PhysFrame>, u64)> {

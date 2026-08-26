@@ -53,6 +53,7 @@ pub struct Endpoint {
     pub id: EndpointId,
     pub owner: u64,
     pub queue: VecDeque<Message>,
+    pub receive_wait_queue: VecDeque<u64>,
     pub state: EndpointState,
 }
 
@@ -62,6 +63,7 @@ impl Endpoint {
             id: EndpointId { index, generation },
             owner: 0,
             queue: VecDeque::with_capacity(MAX_QUEUE_DEPTH),
+            receive_wait_queue: VecDeque::new(),
             state: EndpointState::Free,
         }
     }
@@ -103,6 +105,7 @@ impl EndpointRegistry {
     }
 
     pub fn destroy_endpoint(&mut self, id: EndpointId) -> Result<(), &'static str> {
+        let mut wakeup_tids = alloc::vec::Vec::new();
         if let Some(ep) = self.endpoints.get_mut(id.index as usize) {
             if ep.id.generation != id.generation {
                 return Err("Dangling or mismatched endpoint generation");
@@ -110,14 +113,27 @@ impl EndpointRegistry {
             if ep.state == EndpointState::Active {
                 ep.state = EndpointState::Closed;
                 ep.queue.clear();
-                return Ok(());
+                // Gather all blocked receivers
+                while let Some(tid) = ep.receive_wait_queue.pop_front() {
+                    wakeup_tids.push(tid);
+                }
+            } else {
+                return Err("Endpoint not active");
             }
-            return Err("Endpoint not active");
+        } else {
+            return Err("Endpoint out of bounds");
         }
-        Err("Endpoint out of bounds")
+        
+        if !wakeup_tids.is_empty() {
+            let mut sched = crate::task::scheduler::SCHEDULER.lock();
+            for tid in wakeup_tids {
+                sched.wake_task(tid);
+            }
+        }
+        Ok(())
     }
 
-    // Tick 10: Non-blocking send/receive core primitive (will be expanded in Tick 12)
+    // Tick 12: Blocking receive and waking send
     pub fn send(&mut self, id: EndpointId, msg: Message) -> Result<(), &'static str> {
         if let Some(ep) = self.endpoints.get_mut(id.index as usize) {
             if ep.id.generation != id.generation {
@@ -130,13 +146,19 @@ impl EndpointRegistry {
                 return Err("Queue full");
             }
             ep.queue.push_back(msg);
+            
+            // Wake ONE waiter if present
+            if let Some(tid) = ep.receive_wait_queue.pop_front() {
+                crate::task::scheduler::SCHEDULER.lock().wake_task(tid);
+            }
             Ok(())
         } else {
             Err("Endpoint out of bounds")
         }
     }
 
-    pub fn receive(&mut self, id: EndpointId) -> Result<Message, &'static str> {
+    /// Returns Ok(Some(msg)) if available, Ok(None) if blocked, Err if closed.
+    pub fn receive(&mut self, id: EndpointId) -> Result<Option<Message>, &'static str> {
         if let Some(ep) = self.endpoints.get_mut(id.index as usize) {
             if ep.id.generation != id.generation {
                 return Err("Dangling or mismatched endpoint generation");
@@ -145,9 +167,13 @@ impl EndpointRegistry {
                 return Err("Endpoint is closed");
             }
             if let Some(msg) = ep.queue.pop_front() {
-                Ok(msg)
+                Ok(Some(msg))
             } else {
-                Err("Queue empty")
+                let mut sched = crate::task::scheduler::SCHEDULER.lock();
+                let tid = sched.current_tid().expect("No task running");
+                ep.receive_wait_queue.push_back(tid);
+                sched.block_current(crate::task::process::BlockReason::ReceiveIPC(id));
+                Ok(None)
             }
         } else {
             Err("Endpoint out of bounds")
@@ -179,7 +205,7 @@ pub fn cap_send(
 
     // Guard 6: Send through IPC core (C1, C3 — endpoint state + queue depth)
     IPC_REGISTRY.lock().send(endpoint_id, msg)
-        .map_err(|_| CapError::IpcError)
+        .map_err(|e| if e == "Endpoint is closed" { CapError::EndpointClosed } else { CapError::IpcError })
 }
 
 /// Capability-validated receive.
@@ -190,7 +216,16 @@ pub fn cap_receive(
     // Guard 1–4: validate handle, generation, rights (C4, C5, C12)
     let endpoint_id = table.validate(handle, CAP_RECEIVE)?;
 
-    // Receive through IPC core
-    IPC_REGISTRY.lock().receive(endpoint_id)
-        .map_err(|_| CapError::IpcError)
+    loop {
+        let result = IPC_REGISTRY.lock().receive(endpoint_id);
+        match result {
+            Ok(Some(msg)) => return Ok(msg),
+            Ok(None) => {
+                // Blocked. Yield CPU to scheduler.
+                crate::task::scheduler::do_schedule();
+            }
+            Err(e) if e == "Endpoint is closed" => return Err(CapError::EndpointClosed),
+            Err(_) => return Err(CapError::IpcError),
+        }
+    }
 }

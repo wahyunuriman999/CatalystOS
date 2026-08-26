@@ -137,8 +137,10 @@ pub enum CapError {
     StaleHandle,
     /// Rights check failed — caller lacks required permission (C5)
     InsufficientRights,
-    /// IPC core layer error (queue full, endpoint closed, etc.)
+    /// IPC core layer error (queue full, etc.)
     IpcError,
+    /// Endpoint was closed or destroyed (C14)
+    EndpointClosed,
 }
 
 impl CapError {
@@ -147,7 +149,8 @@ impl CapError {
             CapError::InvalidHandle      => "CAPABILITY DENIED: Invalid or forged handle",
             CapError::StaleHandle        => "CAPABILITY DENIED: Stale handle (generation mismatch)",
             CapError::InsufficientRights => "CAPABILITY DENIED: Insufficient rights",
-            CapError::IpcError           => "IPC: Core layer error",
+            CapError::IpcError           => "IPC: Core layer error (e.g., Queue Full)",
+            CapError::EndpointClosed     => "IPC: Endpoint closed",
         }
     }
 }

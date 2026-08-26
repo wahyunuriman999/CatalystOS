@@ -1,12 +1,67 @@
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicUsize, AtomicBool, AtomicU64, Ordering};
 use alloc::sync::Arc;
 use crate::kprintln;
-use crate::task::process::{Process, Task, STACK_SIZE};
+use crate::task::process::{Process, Task, STACK_SIZE, TaskState, BlockReason};
 use crate::task::scheduler::SCHEDULER;
 use x86_64::structures::paging::{Page, Size4KiB, PageTableFlags, Mapper, FrameAllocator, PhysFrame};
 use x86_64::VirtAddr;
+use crate::ipc::{IPC_REGISTRY, CapabilityTable, CapabilityHandle, CapError, CAP_SEND, CAP_RECEIVE, cap_send, cap_receive, EndpointId};
 
 static TEST_FRAMES: AtomicUsize = AtomicUsize::new(0);
+
+static TEST_N_DONE: AtomicBool = AtomicBool::new(false);
+static TEST_N_EP: AtomicU64 = AtomicU64::new(0);
+
+static TEST_O_DONE: AtomicBool = AtomicBool::new(false);
+static TEST_O_EP: AtomicU64 = AtomicU64::new(0);
+
+static TEST_Q_DONE: AtomicBool = AtomicBool::new(false);
+static TEST_Q_EP: AtomicU64 = AtomicU64::new(0);
+
+fn test_n_receiver() -> ! {
+    let ep_val = TEST_N_EP.load(Ordering::SeqCst);
+    let ep = EndpointId { index: (ep_val & 0xFFFFFFFF) as u32, generation: (ep_val >> 32) as u32 };
+    
+    let mut table = CapabilityTable::new(3000);
+    let handle = table.grant(ep, CAP_RECEIVE);
+    
+    let msg = cap_receive(&table, handle).unwrap();
+    assert_eq!(msg.data[0], 42);
+    
+    TEST_N_DONE.store(true, Ordering::SeqCst);
+    crate::task::scheduler::terminate_current_thread();
+}
+
+fn test_o_receiver() -> ! {
+    let ep_val = TEST_O_EP.load(Ordering::SeqCst);
+    let ep = EndpointId { index: (ep_val & 0xFFFFFFFF) as u32, generation: (ep_val >> 32) as u32 };
+    
+    let mut table = CapabilityTable::new(3001);
+    let handle = table.grant(ep, CAP_RECEIVE);
+    
+    for i in 0..10 {
+        let msg = cap_receive(&table, handle).unwrap();
+        assert_eq!(msg.data[0], i as u8);
+    }
+    
+    TEST_O_DONE.store(true, Ordering::SeqCst);
+    crate::task::scheduler::terminate_current_thread();
+}
+
+fn test_q_receiver() -> ! {
+    let ep_val = TEST_Q_EP.load(Ordering::SeqCst);
+    let ep = EndpointId { index: (ep_val & 0xFFFFFFFF) as u32, generation: (ep_val >> 32) as u32 };
+    
+    let mut table = CapabilityTable::new(3002);
+    let handle = table.grant(ep, CAP_RECEIVE);
+    
+    let result = cap_receive(&table, handle);
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err(), CapError::EndpointClosed);
+    
+    TEST_Q_DONE.store(true, Ordering::SeqCst);
+    crate::task::scheduler::terminate_current_thread();
+}
 
 pub fn run_all_tests() {
     kprintln!("========== CATALYST OS PHASE 3 ==========");
@@ -158,12 +213,92 @@ fn monitor_thread() -> ! {
         assert_eq!(result.unwrap_err(), CapError::InvalidHandle);
         kprintln!("[TEST M] CROSS-PROCESS BOUNDARY -> REJECTED . PASS");
     }
+
+    // ─── Phase 4 Tick 12: Blocking + Wakeup ─────────────────────────────
+    
+    // Test N — Basic Blocking
+    {
+        let ep = IPC_REGISTRY.lock().create_endpoint(3000).unwrap();
+        TEST_N_EP.store((ep.index as u64) | ((ep.generation as u64) << 32), Ordering::SeqCst);
+        let receiver_tid = spawn_kernel_task("test_n_recv", test_n_receiver);
+        
+        // Wait for receiver to block
+        loop {
+            let state = SCHEDULER.lock().tasks.iter().find(|t| t.tid == receiver_tid).unwrap().state;
+            if let TaskState::Blocked(_) = state {
+                break;
+            }
+            crate::task::scheduler::do_schedule();
+        }
+        
+        let mut table = CapabilityTable::new(3001);
+        let handle = table.grant(ep, CAP_SEND);
+        cap_send(&table, handle, &[42; 256], 3001).unwrap();
+        
+        wait_for_task_dead(receiver_tid);
+        assert!(TEST_N_DONE.load(Ordering::SeqCst));
+        kprintln!("[TEST N] BASIC BLOCKING WAKEUP .............. PASS");
+    }
+
+    // Test O — Lost Wakeup Stress
+    {
+        let ep = IPC_REGISTRY.lock().create_endpoint(3001).unwrap();
+        TEST_O_EP.store((ep.index as u64) | ((ep.generation as u64) << 32), Ordering::SeqCst);
+        let receiver_tid = spawn_kernel_task("test_o_recv", test_o_receiver);
+        
+        let mut table = CapabilityTable::new(3002);
+        let handle = table.grant(ep, CAP_SEND);
+        for i in 0..10 {
+            cap_send(&table, handle, &[i; 256], 3002).unwrap();
+            crate::task::scheduler::do_schedule(); // Force interleaving
+        }
+        
+        wait_for_task_dead(receiver_tid);
+        assert!(TEST_O_DONE.load(Ordering::SeqCst));
+        kprintln!("[TEST O] NO LOST WAKEUP (STRESS) ............ PASS");
+    }
+
+    // Test P — Queue Full
+    {
+        let ep = IPC_REGISTRY.lock().create_endpoint(3002).unwrap();
+        let mut table = CapabilityTable::new(3003);
+        let handle = table.grant(ep, CAP_SEND);
+        
+        for _ in 0..64 {
+            cap_send(&table, handle, b"test", 3003).unwrap();
+        }
+        let result = cap_send(&table, handle, b"test", 3003);
+        assert_eq!(result.unwrap_err(), CapError::IpcError); // Queue full
+        kprintln!("[TEST P] QUEUE FULL -> NON-BLOCKING ......... PASS");
+    }
+
+    // Test Q — Endpoint Destruction
+    {
+        let ep = IPC_REGISTRY.lock().create_endpoint(3003).unwrap();
+        TEST_Q_EP.store((ep.index as u64) | ((ep.generation as u64) << 32), Ordering::SeqCst);
+        let receiver_tid = spawn_kernel_task("test_q_recv", test_q_receiver);
+        
+        // Wait for receiver to block
+        loop {
+            let state = SCHEDULER.lock().tasks.iter().find(|t| t.tid == receiver_tid).unwrap().state;
+            if let TaskState::Blocked(_) = state {
+                break;
+            }
+            crate::task::scheduler::do_schedule();
+        }
+        
+        IPC_REGISTRY.lock().destroy_endpoint(ep).unwrap();
+        
+        wait_for_task_dead(receiver_tid);
+        assert!(TEST_Q_DONE.load(Ordering::SeqCst));
+        kprintln!("[TEST Q] DESTROY ENDPOINT WAKES WAITERS ..... PASS");
+    }
     // ─────────────────────────────────────────────────────────────────────────
 
     kprintln!("");
     kprintln!("[PHASE 3+4 RUNTIME VERIFICATION]");
-    kprintln!("Tests: 13");
-    kprintln!("Passed: 13");
+    kprintln!("Tests: 17");
+    kprintln!("Passed: 17");
     kprintln!("Failed: 0");
     kprintln!("Kernel Panics: 0");
     kprintln!("Double Faults: 0");
@@ -270,6 +405,13 @@ fn spawn_user_test(test_id: u8) -> u64 {
     task.process = process;
     let tid = task.tid;
     
+    SCHEDULER.lock().add_task(task).unwrap();
+    tid
+}
+
+fn spawn_kernel_task(name: &'static str, entry: fn() -> !) -> u64 {
+    let task = Task::new(name, entry, 10);
+    let tid = task.tid;
     SCHEDULER.lock().add_task(task).unwrap();
     tid
 }

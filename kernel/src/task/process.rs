@@ -9,15 +9,21 @@ use core::sync::atomic::{AtomicU64, Ordering};
 use alloc::sync::Arc;
 use spin::Mutex;
 use crate::memory::address_space::AddressSpace;
+use crate::ipc::EndpointId;
 
 static NEXT_PID: AtomicU64 = AtomicU64::new(1);
 static NEXT_TID: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlockReason {
+    ReceiveIPC(EndpointId),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskState {
     Ready,
     Running,
-    Blocked,
+    Blocked(BlockReason),
     Sleeping,
     Dead,
 }
