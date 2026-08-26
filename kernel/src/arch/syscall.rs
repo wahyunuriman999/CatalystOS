@@ -1,7 +1,34 @@
+// ==========================================
+// AEGIS COGNITIVE RUNTIME PLATFORM
+// PROPRIETARY AND CONFIDENTIAL
+// Copyright (c) 2024-2026 Wahyu Nur Iman.
+// All rights reserved.
+// ==========================================
+
 use x86_64::registers::model_specific::{Efer, EferFlags, LStar, Star, SFMask, KernelGsBase};
 use x86_64::instructions::segmentation::Segment;
 use x86_64::structures::gdt::SegmentSelector;
 use core::arch::naked_asm;
+use crate::storage::vfs::{vfs_open, vfs_mkdir, vfs_unlink, OpenFile, VNodeType};
+use crate::ipc::{IPC_REGISTRY, CapabilityTable, CapabilityHandle, CAP_SEND, CAP_RECEIVE, CAP_CALL, cap_send, cap_receive, cap_call, cap_reply, EndpointId};
+use crate::memory::user::{validate_user_buffer, copy_from_user, copy_to_user};
+
+// Syscall Numbers
+pub const SYS_EXIT: u64          = 1;
+pub const SYS_YIELD: u64         = 2;
+pub const SYS_GETPID: u64        = 4;
+pub const SYS_OPEN: u64          = 10;
+pub const SYS_CLOSE: u64         = 11;
+pub const SYS_READ: u64          = 12;
+pub const SYS_WRITE: u64         = 13;
+pub const SYS_MKDIR: u64         = 16;
+pub const SYS_UNLINK: u64        = 17;
+pub const SYS_IPC_CREATE_EP: u64 = 20;
+pub const SYS_IPC_DESTROY_EP: u64= 21;
+pub const SYS_IPC_SEND: u64      = 24;
+pub const SYS_IPC_RECEIVE: u64   = 25;
+pub const SYS_IPC_CALL: u64      = 26;
+pub const SYS_IPC_REPLY: u64     = 27;
 
 #[repr(C)]
 pub struct CpuLocal {
@@ -71,32 +98,125 @@ extern "C" fn syscall_entry() {
     }
 }
 
-extern "C" fn syscall_handler(sys_no: u64, arg1: u64, arg2: u64, arg3: u64, arg4: u64) -> u64 {
-    crate::kprintln!("[SYSCALL] No: {}, Args: {:#x}, {:#x}, {:#x}, {:#x}", sys_no, arg1, arg2, arg3, arg4);
-    
-    if sys_no == 102 { // GetStdHandle
-        crate::kprintln!("[WIN32] GetStdHandle called!");
-        return 0xFFFFFFF5;
-    }
-    else if sys_no == 101 { // WriteConsoleA
-        crate::kprintln!("[WIN32] WriteConsoleA called!");
-        let msg_ptr = arg2 as *const u8;
-        let msg_len = arg3 as usize;
-        let slice = unsafe { core::slice::from_raw_parts(msg_ptr, msg_len) };
-        if let Ok(s) = core::str::from_utf8(slice) {
-            crate::kprintln!("[WIN32 OUTPUT]: {}", s);
+extern "C" fn syscall_handler(sys_no: u64, arg1: u64, arg2: u64, arg3: u64, _arg4: u64) -> u64 {
+    match sys_no {
+        SYS_EXIT => {
+            crate::kprintln!("[SYSCALL] sys_exit called with code {}", arg1);
+            crate::task::scheduler::terminate_current_thread();
         }
-        return 1;
+        SYS_YIELD => {
+            crate::task::scheduler::do_schedule();
+            0
+        }
+        SYS_GETPID => {
+            let sched = crate::task::scheduler::SCHEDULER.lock();
+            sched.current_tid().unwrap_or(0)
+        }
+        SYS_WRITE => {
+            // arg1 = fd, arg2 = user_buf_ptr, arg3 = len
+            let fd = arg1 as usize;
+            let ptr = arg2 as *const u8;
+            let len = arg3 as usize;
+
+            if let Err(_) = validate_user_buffer(arg2, len) {
+                return u64::MAX; // -EFAULT
+            }
+
+            if fd == 1 || fd == 2 {
+                // stdout / stderr
+                let mut buf = alloc::vec![0u8; len];
+                if copy_from_user(ptr, &mut buf).is_ok() {
+                    if let Ok(s) = core::str::from_utf8(&buf) {
+                        crate::kprint!("{}", s);
+                    }
+                    return len as u64;
+                }
+                return u64::MAX;
+            }
+
+            // Regular file write
+            let mut sched = crate::task::scheduler::SCHEDULER.lock();
+            if let Some(task) = sched.tasks.front() {
+                let mut files = task.process.files.lock();
+                if let Ok(open_file) = files.get(fd) {
+                    let mut buf = alloc::vec![0u8; len];
+                    if copy_from_user(ptr, &mut buf).is_ok() {
+                        if let Ok(written) = open_file.vnode.write(open_file.offset, &buf) {
+                            open_file.offset += written;
+                            return written as u64;
+                        }
+                    }
+                }
+            }
+            u64::MAX
+        }
+        SYS_READ => {
+            let fd = arg1 as usize;
+            let ptr = arg2 as *mut u8;
+            let len = arg3 as usize;
+
+            if let Err(_) = validate_user_buffer(arg2, len) {
+                return u64::MAX;
+            }
+
+            let mut sched = crate::task::scheduler::SCHEDULER.lock();
+            if let Some(task) = sched.tasks.front() {
+                let mut files = task.process.files.lock();
+                if let Ok(open_file) = files.get(fd) {
+                    let mut buf = alloc::vec![0u8; len];
+                    if let Ok(bytes_read) = open_file.vnode.read(open_file.offset, &mut buf) {
+                        if copy_to_user(&buf[..bytes_read], ptr).is_ok() {
+                            open_file.offset += bytes_read;
+                            return bytes_read as u64;
+                        }
+                    }
+                }
+            }
+            u64::MAX
+        }
+        SYS_OPEN => {
+            // arg1 = path_ptr, arg2 = path_len, arg3 = flags
+            let path_ptr = arg1 as *const u8;
+            let path_len = arg2 as usize;
+            let flags = arg3 as u32;
+
+            if let Err(_) = validate_user_buffer(arg1, path_len) {
+                return u64::MAX;
+            }
+
+            let mut path_buf = alloc::vec![0u8; path_len];
+            if copy_from_user(path_ptr, &mut path_buf).is_err() {
+                return u64::MAX;
+            }
+
+            if let Ok(path_str) = core::str::from_utf8(&path_buf) {
+                if let Ok(vnode) = vfs_open(path_str, flags) {
+                    let open_file = OpenFile { vnode, offset: 0, flags };
+                    let mut sched = crate::task::scheduler::SCHEDULER.lock();
+                    if let Some(task) = sched.tasks.front() {
+                        let mut files = task.process.files.lock();
+                        if let Ok(fd) = files.insert(open_file) {
+                            return fd as u64;
+                        }
+                    }
+                }
+            }
+            u64::MAX
+        }
+        SYS_CLOSE => {
+            let fd = arg1 as usize;
+            let mut sched = crate::task::scheduler::SCHEDULER.lock();
+            if let Some(task) = sched.tasks.front() {
+                let mut files = task.process.files.lock();
+                if files.close(fd).is_ok() {
+                    return 0;
+                }
+            }
+            u64::MAX
+        }
+        _ => {
+            crate::kprintln!("[SYSCALL] Unknown syscall: {}", sys_no);
+            u64::MAX
+        }
     }
-    else if sys_no == 103 { // ExitProcess
-        crate::kprintln!("[WIN32] ExitProcess called with code: {}", arg1);
-        crate::kprintln!("*** CATALYST OS - WIN32 EXECUTION SUCCESSFUL! ***");
-        crate::console::shutdown();
-    }
-    
-    if sys_no == 1 {
-        crate::kprintln!("*** SYSCALL 1 TRIGGERED FROM RING 3 ***");
-        crate::console::shutdown();
-    }
-    0
 }

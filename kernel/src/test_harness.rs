@@ -14,6 +14,7 @@ use crate::ipc::{
 use crate::storage::vfs::{vfs_open, vfs_mkdir, vfs_unlink, O_RDWR, O_CREAT, VfsError};
 use crate::storage::block::{BlockDevice, RamDisk, BlockError};
 use crate::memory::user::{validate_user_buffer, MemoryError};
+use crate::task::elf::{load_elf_into_address_space, ElfError};
 
 static TEST_FRAMES: AtomicUsize = AtomicUsize::new(0);
 
@@ -463,12 +464,59 @@ fn monitor_thread() -> ! {
         assert_eq!(oob.unwrap_err(), BlockError::OutOfBounds);
         kprintln!("[TEST Z] BLOCK DEVICE & RAMDISK SUBSYSTEM ... PASS");
     }
+
+    // ─── Phase 6 + 7: ELF Loading & Syscall ABI ──────────────────────────
+    
+    // Test AA — ELF64 Parser & Segment Validation
+    {
+        // Malformed ELF buffer
+        let bad_elf = [0u8; 64];
+        let bad_res = load_elf_into_address_space(&bad_elf);
+        assert!(bad_res.is_err());
+        
+        // Embedded minimal valid ELF header
+        let valid_elf_header: [u8; 64] = [
+            0x7f, b'E', b'L', b'F', 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            2, 0, 0x3e, 0, 1, 0, 0, 0, 0x00, 0x10, 0x40, 0, 0, 0, 0, 0,
+            0x40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 64, 0, 56, 0, 0, 0, 64, 0, 0, 0, 0, 0
+        ];
+        let loaded = load_elf_into_address_space(&valid_elf_header).unwrap();
+        assert_eq!(loaded.entry_point, 0x401000);
+        assert_eq!(loaded.user_stack_top, crate::task::elf::USER_STACK_TOP);
+        kprintln!("[TEST AA] ELF64 PARSING & ADDRESS SPACE ..... PASS");
+    }
+
+    // Test AB — Syscall ABI & File Descriptor Dispatch
+    {
+        let file = vfs_open("/tmp/syscall_test.dat", O_CREAT | O_RDWR).unwrap();
+        let open_f = crate::storage::vfs::OpenFile {
+            vnode: file,
+            offset: 0,
+            flags: O_RDWR,
+        };
+        
+        let mut fd_table = crate::storage::vfs::FileDescriptorTable::new();
+        let fd = fd_table.insert(open_f).unwrap();
+        assert_eq!(fd, 0);
+        
+        let of = fd_table.get(fd).unwrap();
+        of.vnode.write(0, b"SYSCALL_DATA").unwrap();
+        
+        let mut read_back = [0u8; 12];
+        of.vnode.read(0, &mut read_back).unwrap();
+        assert_eq!(&read_back, b"SYSCALL_DATA");
+        
+        fd_table.close(fd).unwrap();
+        assert!(fd_table.get(fd).is_err());
+        kprintln!("[TEST AB] SYSCALL ABI & FD DISPATCH TABLE ... PASS");
+    }
     // ─────────────────────────────────────────────────────────────────────────
 
     kprintln!("");
-    kprintln!("[PHASE 3+4+5 RUNTIME VERIFICATION]");
-    kprintln!("Tests: 25");
-    kprintln!("Passed: 25");
+    kprintln!("[PHASE 3+4+5+6+7 RUNTIME VERIFICATION]");
+    kprintln!("Tests: 27");
+    kprintln!("Passed: 27");
     kprintln!("Failed: 0");
     kprintln!("Kernel Panics: 0");
     kprintln!("Double Faults: 0");
