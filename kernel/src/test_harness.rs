@@ -15,6 +15,7 @@ use crate::storage::vfs::{vfs_open, vfs_mkdir, vfs_unlink, O_RDWR, O_CREAT, VfsE
 use crate::storage::block::{BlockDevice, RamDisk, BlockError};
 use crate::memory::user::{validate_user_buffer, MemoryError};
 use crate::task::elf::{load_elf_into_address_space, ElfError};
+use crate::net::{MacAddress, EtherType, EthernetHeader, Ipv4Address, IpProtocol, Ipv4Header, UdpHeader};
 
 static TEST_FRAMES: AtomicUsize = AtomicUsize::new(0);
 
@@ -511,12 +512,57 @@ fn monitor_thread() -> ! {
         assert!(fd_table.get(fd).is_err());
         kprintln!("[TEST AB] SYSCALL ABI & FD DISPATCH TABLE ... PASS");
     }
+
+    // ─── Phase 11: Network Stack Protocol Verification ───────────────────
+    
+    // Test AC — Ethernet, IPv4, UDP Serialization & Parsing
+    {
+        // 1. Ethernet Header
+        let eth_hdr = EthernetHeader {
+            dst: MacAddress::BROADCAST,
+            src: MacAddress::new(0x52, 0x54, 0x00, 0x12, 0x34, 0x56),
+            ethertype: EtherType::IPv4,
+        };
+        let mut eth_buf = [0u8; 14];
+        let bytes_written = eth_hdr.serialize(&mut eth_buf).unwrap();
+        assert_eq!(bytes_written, 14);
+        
+        let (parsed_eth, _) = EthernetHeader::parse(&eth_buf).unwrap();
+        assert_eq!(parsed_eth.dst, MacAddress::BROADCAST);
+        assert_eq!(parsed_eth.ethertype, EtherType::IPv4);
+        
+        // 2. IPv4 Checksum & Header
+        let ip_bytes: [u8; 20] = [
+            0x45, 0x00, 0x00, 0x3C, 0x1C, 0x46, 0x40, 0x00, 0x40, 0x06,
+            0x00, 0x00, // Zero checksum for calculation
+            127, 0, 0, 1, 127, 0, 0, 1
+        ];
+        let csum = Ipv4Header::calculate_checksum(&ip_bytes);
+        assert_ne!(csum, 0);
+        
+        // 3. UDP Header
+        let udp_hdr = UdpHeader {
+            src_port: 8080,
+            dst_port: 80,
+            length: 16,
+            checksum: 0,
+        };
+        let mut udp_buf = [0u8; 16];
+        udp_hdr.serialize(&mut udp_buf[..8]).unwrap();
+        udp_buf[8..16].copy_from_slice(b"TESTDATA");
+        
+        let (parsed_udp, payload) = UdpHeader::parse(&udp_buf).unwrap();
+        assert_eq!(parsed_udp.src_port, 8080);
+        assert_eq!(parsed_udp.dst_port, 80);
+        assert_eq!(payload, b"TESTDATA");
+        kprintln!("[TEST AC] NET ETHERNET/IPV4/UDP PROTOCOLS ... PASS");
+    }
     // ─────────────────────────────────────────────────────────────────────────
 
     kprintln!("");
-    kprintln!("[PHASE 3+4+5+6+7 RUNTIME VERIFICATION]");
-    kprintln!("Tests: 27");
-    kprintln!("Passed: 27");
+    kprintln!("[PHASE 3+4+5+6+7+11 RUNTIME VERIFICATION]");
+    kprintln!("Tests: 28");
+    kprintln!("Passed: 28");
     kprintln!("Failed: 0");
     kprintln!("Kernel Panics: 0");
     kprintln!("Double Faults: 0");
