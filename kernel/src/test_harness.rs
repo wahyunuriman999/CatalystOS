@@ -16,6 +16,7 @@ use crate::storage::block::{BlockDevice, RamDisk, BlockError};
 use crate::memory::user::{validate_user_buffer, MemoryError};
 use crate::task::elf::{load_elf_into_address_space, ElfError};
 use crate::net::{MacAddress, EtherType, EthernetHeader, Ipv4Address, IpProtocol, Ipv4Header, UdpHeader};
+use crate::init::services::{SERVICE_MANAGER, ServiceManager, ServiceState};
 
 static TEST_FRAMES: AtomicUsize = AtomicUsize::new(0);
 
@@ -557,12 +558,36 @@ fn monitor_thread() -> ! {
         assert_eq!(payload, b"TESTDATA");
         kprintln!("[TEST AC] NET ETHERNET/IPV4/UDP PROTOCOLS ... PASS");
     }
+
+    // ─── Phase 12: System Services & Microkernel Service Manager ─────────
+    
+    // Test AD — Service Lifecycle & Auto-Restart Policy
+    {
+        let mut sm = ServiceManager::new();
+        let svc_id = sm.register("test_daemon", true);
+        
+        let ep = EndpointId { index: 99, generation: 1 };
+        sm.set_running(svc_id, 777, ep).unwrap();
+        
+        let found_ep = sm.get_service_endpoint("test_daemon").unwrap();
+        assert_eq!(found_ep, ep);
+        
+        // Simulate crash
+        let restart_id = sm.notify_crash(777);
+        assert_eq!(restart_id, Some(svc_id));
+        
+        let list = sm.list();
+        let svc_info = list.iter().find(|(id, _, _, _)| *id == svc_id).unwrap();
+        assert_eq!(svc_info.2, ServiceState::Restarting);
+        assert_eq!(svc_info.3, 1); // 1 restart
+        kprintln!("[TEST AD] SERVICE MANAGER & CRASH RESTART ... PASS");
+    }
     // ─────────────────────────────────────────────────────────────────────────
 
     kprintln!("");
-    kprintln!("[PHASE 3+4+5+6+7+11 RUNTIME VERIFICATION]");
-    kprintln!("Tests: 28");
-    kprintln!("Passed: 28");
+    kprintln!("[CATALYST OS COMPREHENSIVE RUNTIME VERIFICATION]");
+    kprintln!("Tests: 29");
+    kprintln!("Passed: 29");
     kprintln!("Failed: 0");
     kprintln!("Kernel Panics: 0");
     kprintln!("Double Faults: 0");
