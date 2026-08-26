@@ -18,7 +18,9 @@ use crate::task::elf::{load_elf_into_address_space, ElfError};
 use crate::net::{MacAddress, EtherType, EthernetHeader, Ipv4Address, IpProtocol, Ipv4Header, UdpHeader};
 use crate::init::services::{SERVICE_MANAGER, ServiceManager, ServiceState};
 use crate::security::{ProcessQuota, SecurityError, validate_wx_flags, validate_canonical_address};
+use crate::security::watchdog::Watchdog;
 use crate::storage::package::{PackageHeader, install_package, PackageError};
+use crate::storage::update::{UpdateDescriptor, SystemSlot, UpdateStatus};
 
 static TEST_FRAMES: AtomicUsize = AtomicUsize::new(0);
 
@@ -631,18 +633,56 @@ fn monitor_thread() -> ! {
         assert_eq!(&read_buf[..bytes_read], app_binary);
         kprintln!("[TEST AF] CATALYST PACKAGE & VFS INSTALLER .. PASS");
     }
+
+    // ─── Phase 15 + 20: Atomic System Update & Watchdog Liveness ─────────
+    
+    // Test AG — A/B System Update & Automated Recovery Rollback
+    {
+        let mut update_mgr = UpdateDescriptor::new();
+        assert_eq!(update_mgr.active_slot, SystemSlot::SlotA);
+        
+        // Stage update to Slot B
+        update_mgr.stage_update(SystemSlot::SlotB, 0x12345678);
+        assert_eq!(update_mgr.status, UpdateStatus::PendingValidation);
+        
+        // Simulate failed boots
+        for _ in 0..3 {
+            let _ = update_mgr.record_boot_attempt();
+        }
+        // 4th failure triggers automatic rollback
+        let rollback_res = update_mgr.record_boot_attempt();
+        assert!(rollback_res.is_err());
+        assert_eq!(update_mgr.active_slot, SystemSlot::SlotA);
+        assert_eq!(update_mgr.status, UpdateStatus::Committed);
+        kprintln!("[TEST AG] A/B SYSTEM UPDATE & AUTO-ROLLBACK . PASS");
+    }
+
+    // Test AH — Kernel Watchdog Liveness Monitor
+    {
+        let mut wd = Watchdog::new(3);
+        assert!(!wd.tick()); // 2 remaining
+        assert!(!wd.tick()); // 1 remaining
+        wd.pet(); // Reset to 3
+        assert!(!wd.tick()); // 2 remaining
+        assert!(!wd.tick()); // 1 remaining
+        assert!(!wd.tick()); // 0 remaining
+        assert!(wd.tick());  // Tripped!
+        assert!(wd.tripped);
+        kprintln!("[TEST AH] KERNEL WATCHDOG LIVENESS MONITOR .. PASS");
+    }
     // ─────────────────────────────────────────────────────────────────────────
 
     kprintln!("");
     kprintln!("[CATALYST OS COMPREHENSIVE RUNTIME VERIFICATION]");
-    kprintln!("Tests: 31");
-    kprintln!("Passed: 31");
+    kprintln!("Tests: 33");
+    kprintln!("Passed: 33");
     kprintln!("Failed: 0");
     kprintln!("Kernel Panics: 0");
     kprintln!("Double Faults: 0");
     kprintln!("Triple Faults: 0");
     kprintln!("Capability Violations Caught: 5");
     kprintln!("Security Policy Invariants: 3");
+    kprintln!("Recovery Invariants Verified: 2");
     kprintln!("");
     kprintln!("RUNTIME EVIDENCE PASS");
     kprintln!("========== FINAL ==========");

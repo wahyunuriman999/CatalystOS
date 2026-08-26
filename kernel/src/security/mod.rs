@@ -6,8 +6,10 @@
 // ==========================================
 
 pub mod quota;
+pub mod watchdog;
 
 pub use quota::{ProcessQuota, SecurityError, validate_wx_flags, validate_canonical_address};
+pub use watchdog::{Watchdog, KERNEL_WATCHDOG};
 
 pub fn init_security() {
     crate::kprintln!("[SECURITY] Hardening subsystem active: W^X, Canonical Addresses, Process Quotas.");
