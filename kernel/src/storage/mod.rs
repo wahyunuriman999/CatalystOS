@@ -8,11 +8,13 @@
 pub mod vfs;
 pub mod ramfs;
 pub mod block;
+pub mod package;
 
 use alloc::sync::Arc;
 pub use vfs::{VFS, VfsError, VNodeType, vfs_open, vfs_mkdir, vfs_unlink, O_RDONLY, O_WRONLY, O_RDWR, O_CREAT, O_TRUNC};
 pub use ramfs::RamFS;
 pub use block::{BlockDevice, RamDisk};
+pub use package::{PackageHeader, PackageError, install_package};
 
 pub fn init() {
     crate::kprintln!("[STORAGE] Initializing Virtual File System (VFS)...");

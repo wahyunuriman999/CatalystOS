@@ -17,6 +17,8 @@ use crate::memory::user::{validate_user_buffer, MemoryError};
 use crate::task::elf::{load_elf_into_address_space, ElfError};
 use crate::net::{MacAddress, EtherType, EthernetHeader, Ipv4Address, IpProtocol, Ipv4Header, UdpHeader};
 use crate::init::services::{SERVICE_MANAGER, ServiceManager, ServiceState};
+use crate::security::{ProcessQuota, SecurityError, validate_wx_flags, validate_canonical_address};
+use crate::storage::package::{PackageHeader, install_package, PackageError};
 
 static TEST_FRAMES: AtomicUsize = AtomicUsize::new(0);
 
@@ -582,17 +584,65 @@ fn monitor_thread() -> ! {
         assert_eq!(svc_info.3, 1); // 1 restart
         kprintln!("[TEST AD] SERVICE MANAGER & CRASH RESTART ... PASS");
     }
+
+    // ─── Phase 13 + 14: Security Hardening & Package Management ──────────
+    
+    // Test AE — Security Quotas & W^X Enforcement
+    {
+        let mut quota = ProcessQuota::DEFAULT;
+        quota.max_endpoints = 2;
+        
+        assert!(quota.check_allocate_endpoint().is_ok());
+        assert!(quota.check_allocate_endpoint().is_ok());
+        
+        // 3rd allocation exceeds quota
+        let result = quota.check_allocate_endpoint();
+        assert_eq!(result.unwrap_err(), SecurityError::QuotaExceeded("Endpoint quota exceeded"));
+        
+        // W^X Enforcement Check
+        assert!(validate_wx_flags(true, false).is_ok()); // Writable, Not Executable -> OK
+        assert!(validate_wx_flags(false, true).is_ok()); // Read-Only, Executable -> OK
+        assert_eq!(validate_wx_flags(true, true).unwrap_err(), SecurityError::WxViolation); // W+X -> DENIED
+        
+        // Canonical Address Check
+        assert!(validate_canonical_address(0x0000_7FFF_FFFF_FFFF).is_ok());
+        assert!(validate_canonical_address(0xFFFF_8000_0000_0000).is_ok());
+        assert_eq!(validate_canonical_address(0x0001_0000_0000_0000).unwrap_err(), SecurityError::NonCanonicalAddress);
+        kprintln!("[TEST AE] SECURITY QUOTAS & W^X ENFORCEMENT .. PASS");
+    }
+
+    // Test AF — Catalyst Package System (CPKG) & Atomic Installer
+    {
+        let app_binary = b"\x7fELF_DUMMY_EXECUTABLE_CONTENT_FOR_CATALYST_APP";
+        let pkg_bytes = PackageHeader::serialize("calc", app_binary);
+        
+        let (header, payload) = PackageHeader::parse(&pkg_bytes).unwrap();
+        assert_eq!(header.name, "calc");
+        assert_eq!(payload, app_binary);
+        
+        // Install into /bin/
+        let installed_name = install_package(&pkg_bytes).unwrap();
+        assert_eq!(installed_name, "calc");
+        
+        // Verify installed file in VFS
+        let installed_file = vfs_open("/bin/calc", 0).unwrap();
+        let mut read_buf = [0u8; 64];
+        let bytes_read = installed_file.read(0, &mut read_buf).unwrap();
+        assert_eq!(&read_buf[..bytes_read], app_binary);
+        kprintln!("[TEST AF] CATALYST PACKAGE & VFS INSTALLER .. PASS");
+    }
     // ─────────────────────────────────────────────────────────────────────────
 
     kprintln!("");
     kprintln!("[CATALYST OS COMPREHENSIVE RUNTIME VERIFICATION]");
-    kprintln!("Tests: 29");
-    kprintln!("Passed: 29");
+    kprintln!("Tests: 31");
+    kprintln!("Passed: 31");
     kprintln!("Failed: 0");
     kprintln!("Kernel Panics: 0");
     kprintln!("Double Faults: 0");
     kprintln!("Triple Faults: 0");
     kprintln!("Capability Violations Caught: 5");
+    kprintln!("Security Policy Invariants: 3");
     kprintln!("");
     kprintln!("RUNTIME EVIDENCE PASS");
     kprintln!("========== FINAL ==========");

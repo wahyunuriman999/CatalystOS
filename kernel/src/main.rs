@@ -21,6 +21,7 @@ pub mod ipc;
 pub mod storage;
 pub mod net;
 pub mod init;
+pub mod security;
 
 use bootloader_api::{entry_point, BootInfo};
 
@@ -64,6 +65,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     storage::init();
     net::init_net();
     init::start_init_process();
+    security::init_security();
     
     crate::kprintln!("---------- M6: Catalyst GUI Desktop ----------");
     if let Some(info) = fb_info {
