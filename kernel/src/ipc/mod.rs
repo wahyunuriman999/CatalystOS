@@ -9,7 +9,7 @@ pub mod capability;
 
 use alloc::collections::VecDeque;
 use spin::Mutex;
-pub use capability::{CapabilityHandle, CapabilityTable, CapError, CAP_SEND, CAP_RECEIVE, CAP_CALL};
+pub use capability::{CapabilityHandle, CapabilityTable, CapError, CAP_SEND, CAP_RECEIVE, CAP_CALL, CAP_SHM_READ, CAP_SHM_WRITE};
 
 pub const MAX_MESSAGE_SIZE: usize = 256;
 pub const MAX_QUEUE_DEPTH: usize = 64;

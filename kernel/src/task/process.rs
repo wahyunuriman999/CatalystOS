@@ -133,6 +133,42 @@ impl Task {
 
         Task { tid, process, name, state: TaskState::Ready, stack, stack_pointer, priority }
     }
+
+    pub fn new_user_task(name: &'static str, loaded: crate::task::elf::LoadedProgram, priority: u8) -> Self {
+        let tid = NEXT_TID.fetch_add(1, Ordering::Relaxed);
+        let pid = NEXT_PID.fetch_add(1, Ordering::Relaxed);
+        let mut stack = alloc::boxed::Box::new(TaskStack([0u8; STACK_SIZE]));
+        
+        let process = Arc::new(Process {
+            pid,
+            address_space: Some(loaded.address_space.clone()),
+            capabilities: Mutex::new(crate::ipc::CapabilityTable::new(pid)),
+            owned_endpoints: Mutex::new(alloc::vec::Vec::new()),
+            files: Mutex::new(crate::storage::vfs::FileDescriptorTable::new()),
+        });
+
+        let entry_point = loaded.entry_point;
+        let user_stack = loaded.user_stack_top;
+
+        let stack_base = stack.0.as_mut_ptr() as usize;
+        let stack_top = stack_base + STACK_SIZE;
+        let frame_start = (stack_top - 8 * 8) as *mut u64;
+
+        unsafe {
+            *frame_start.add(0) = entry_point;
+            *frame_start.add(1) = user_stack;
+            *frame_start.add(2) = 0u64;
+            *frame_start.add(3) = 0u64;
+            *frame_start.add(4) = 0u64;
+            *frame_start.add(5) = 0u64;
+            *frame_start.add(6) = 0x202;
+            *frame_start.add(7) = user_task_entry as *const () as u64;
+        }
+
+        let stack_pointer = frame_start as u64;
+
+        Task { tid, process, name, state: TaskState::Ready, stack, stack_pointer, priority }
+    }
 }
 
 /// Called when a task first starts. r15 = entry_point fn pointer.
@@ -149,6 +185,21 @@ pub unsafe extern "C" fn task_entry() -> ! {
 pub unsafe extern "C" fn task_call_entry(entry: u64) -> ! {
     let f: fn() -> ! = core::mem::transmute(entry as usize);
     f();
+}
+
+#[unsafe(naked)]
+pub unsafe extern "C" fn user_task_entry() -> ! {
+    core::arch::naked_asm!(
+        "mov rdi, r15",
+        "mov rsi, r14",
+        "call user_task_call_entry",
+        "ud2",
+    );
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn user_task_call_entry(entry: u64, stack: u64) -> ! {
+    enter_usermode(entry, stack);
 }
 
 #[unsafe(naked)]

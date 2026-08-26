@@ -61,8 +61,8 @@ jobs:
 
           required_markers = [
               "CATALYST OS COMPREHENSIVE RUNTIME VERIFICATION",
-              "Tests: 36",
-              "Passed: 36",
+              "Tests: 39",
+              "Passed: 39",
               "Failed: 0",
               "Kernel Panics: 0",
               "Double Faults: 0",

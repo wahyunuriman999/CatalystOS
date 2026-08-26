@@ -9,9 +9,11 @@ use alloc::vec::Vec;
 use crate::ipc::EndpointId;
 
 // Rights flags — plain constants, never exposed raw to userspace
-pub const CAP_SEND: u8    = 1 << 0;
-pub const CAP_RECEIVE: u8 = 1 << 1;
-pub const CAP_CALL: u8    = 1 << 2;
+pub const CAP_SEND: u8      = 1 << 0;
+pub const CAP_RECEIVE: u8   = 1 << 1;
+pub const CAP_CALL: u8      = 1 << 2;
+pub const CAP_SHM_READ: u8  = 1 << 3;
+pub const CAP_SHM_WRITE: u8 = 1 << 4;
 
 /// Opaque handle. This is the ONLY token userspace ever holds.
 /// It has no semantic content — it is meaningless outside the owning process's

@@ -29,6 +29,8 @@ pub const SYS_IPC_SEND: u64      = 24;
 pub const SYS_IPC_RECEIVE: u64   = 25;
 pub const SYS_IPC_CALL: u64      = 26;
 pub const SYS_IPC_REPLY: u64     = 27;
+pub const SYS_SPAWN: u64         = 30;
+pub const SYS_WAIT: u64          = 31;
 
 #[repr(C)]
 pub struct CpuLocal {
@@ -247,6 +249,45 @@ extern "C" fn syscall_handler(sys_no: u64, arg1: u64, arg2: u64, arg3: u64, _arg
                 }
             }
             u64::MAX
+        }
+        SYS_SPAWN => {
+            let path_ptr = arg1 as *const u8;
+            let path_len = arg2 as usize;
+            if let Err(_) = validate_user_buffer(arg1, path_len) {
+                return u64::MAX;
+            }
+            let mut path_buf = alloc::vec![0u8; path_len];
+            if copy_from_user(path_ptr, &mut path_buf).is_err() {
+                return u64::MAX;
+            }
+            if let Ok(path_str) = core::str::from_utf8(&path_buf) {
+                if let Ok(file) = vfs_open(path_str, 0) {
+                    let mut elf_data = alloc::vec![0u8; 65536];
+                    if let Ok(n) = file.read(0, &mut elf_data) {
+                        if let Ok(loaded) = crate::task::elf::load_elf_into_address_space(&elf_data[..n]) {
+                            let task = crate::task::process::Task::new_user_task("user_proc", loaded, 1);
+                            let pid = task.process.pid;
+                            let mut sched = crate::task::scheduler::SCHEDULER.lock();
+                            if sched.add_task(task).is_ok() {
+                                return pid;
+                            }
+                        }
+                    }
+                }
+            }
+            u64::MAX
+        }
+        SYS_WAIT => {
+            let target_pid = arg1;
+            let sched = crate::task::scheduler::SCHEDULER.lock();
+            let is_alive = sched.is_task_alive(target_pid);
+            drop(sched);
+            if is_alive {
+                crate::task::scheduler::do_schedule();
+                0
+            } else {
+                0
+            }
         }
         _ => {
             crate::kprintln!("[SYSCALL] Unknown syscall: {}", sys_no);

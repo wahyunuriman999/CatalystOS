@@ -19,6 +19,8 @@ pub const SYS_READ: u64          = 12;
 pub const SYS_WRITE: u64         = 13;
 pub const SYS_MKDIR: u64         = 16;
 pub const SYS_UNLINK: u64        = 17;
+pub const SYS_SPAWN: u64         = 30;
+pub const SYS_WAIT: u64          = 31;
 
 pub const O_RDONLY: u32 = 0;
 pub const O_WRONLY: u32 = 1;
@@ -129,6 +131,23 @@ pub fn unlink(path: &str) -> Result<(), ()> {
         Ok(())
     } else {
         Err(())
+    }
+}
+
+pub fn spawn(path: &str) -> Result<u64, ()> {
+    let ret = unsafe {
+        syscall2(SYS_SPAWN, path.as_ptr() as u64, path.len() as u64)
+    };
+    if ret == u64::MAX {
+        Err(())
+    } else {
+        Ok(ret)
+    }
+}
+
+pub fn wait(pid: u64) -> u64 {
+    unsafe {
+        syscall1(SYS_WAIT, pid)
     }
 }
 
