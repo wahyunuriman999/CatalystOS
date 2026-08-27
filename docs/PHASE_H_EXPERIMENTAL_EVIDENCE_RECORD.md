@@ -11,17 +11,19 @@ This document serves as the official, tamper-evident log for **Phase H (Bare-Met
 
 | Parameter | Value / Verification Data |
 | :--- | :--- |
-| **Git Commit Reference** | [`a21e3e9`](https://github.com/wahyunuriman999/CatalystOS/commit/a21e3e9) |
+| **Git Commit Reference** | [`d2dd6f6`](https://github.com/wahyunuriman999/CatalystOS/commit/d2dd6f6) |
 | **Binary Artifact Path** | `target/x86_64-catalyst/debug/catalyst-kernel.img` |
 | **Artifact File Size** | 10,978,304 bytes (10.721 KB) |
 | **Artifact SHA-256 Hash** | `298587EF635AB5C67429F55F7AACB1A29500FB9F727B0BC18F69299EC6CD3CAC` |
-| **Build Timestamp** | 2026-08-27 12:47:00 UTC+7 |
+| **Physical Flash Status** | 🟢 **VERIFIED ON USB DISK 1** (`catalyst-ke` partition with boot stages & kernel-x86_64) |
 | **Software Baseline Status** | **Software baseline ready for controlled bare-metal validation** |
 
-### Target Machine Profile (Fill upon physical deployment)
-- **Machine Model / Motherboard:** `[e.g., ASUS ROG / Lenovo ThinkPad / Custom Desktop]`
-- **Firmware Mode:** `Legacy BIOS / CSM Mode (Secure Boot Disabled)`
-- **CPU Architecture:** `x86_64`
+### Target Machine Profile
+- **Host / Build Machine:** ASUS ROG Strix SCAR 15 G532LV (Disk 0 Windows 100% Untouched)
+- **Physical Test Target:** Older Lenovo IdeaPad (Live USB Mode — Internal Storage Untouched)
+- **Target Firmware Mode:** Legacy BIOS / CSM Mode (Secure Boot Disabled)
+- **CPU Architecture:** x86_64
+
 - **Total Physical RAM:** `[e.g., 8 GB / 16 GB]`
 - **GPU / Display Controller:** `[e.g., Intel UHD / AMD Radeon / NVIDIA / Basic VESA Framebuffer]`
 - **Storage Controller & Disk:** `[e.g., USB Flash Drive / SATA SSD]`
