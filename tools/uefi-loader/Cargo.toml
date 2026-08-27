@@ -1,0 +1,12 @@
+[package]
+name = "uefi-loader"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[[bin]]
+name = "BOOTX64"
+path = "src/main.rs"
+test = false
+bench = false
