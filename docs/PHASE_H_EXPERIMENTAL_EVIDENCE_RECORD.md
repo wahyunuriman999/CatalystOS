@@ -34,25 +34,74 @@ This document serves as the official, tamper-evident log for **Phase H (Bare-Met
 
 | Gate ID | Reality Milestone | Acceptance Criteria | Observable Evidence | Gate Status |
 | :---: | :--- | :--- | :--- | :---: |
+| **H0** | **Preflight Freeze** | Binary SHA-256 and Git commit verified before touching media. | SHA-256 match: `298587EF...` | 🟢 **PASS** |
 | **H1** | **Boot Reality** | Physical machine boots to Ring 0, discovers ACPI/Memory/DeviceTree, spawns Ring 3 `init`. | Boot banner & desktop framebuffer visible on screen. | ⬜ PENDING TEST |
-| **H2** | **Input Reality** | Physical keyboard drives `inputd` $\rightarrow$ Terminal PTY $\rightarrow$ `/bin/sh` shell session. | Output of `whoami`, `ls`, `mkdir /user/test`, `write`, `cat`. | ⬜ PENDING TEST |
-| **H3** | **Storage Reality** | Non-destructive test media formatted with CPFS, mounted, written, and persistent across clean reboot. | File `/user/test/a` content matches across reboots. | ⬜ PENDING TEST |
-| **H3-Crash** | **Power-Loss Recovery** | Catastrophic power-cut during write $\rightarrow$ WAL replayed upon reboot $\rightarrow$ `fsck` passes. | Zero filesystem corruption after dirty reboot. | ⬜ PENDING TEST |
+| **H2** | **Input Reality** | Physical keyboard drives `inputd` $\rightarrow$ Terminal PTY $\rightarrow$ `/bin/sh` shell session. | Output of `whoami`, `ls`, `mkdir /user/test`, `write`, `cat` == 'catalyst'. | ⬜ PENDING TEST |
+| **H3-A** | **Normal Persistence** | Non-destructive test media formatted with CPFS, mounted, written, and persistent across clean reboot. | File `/user/test/a` content matches across reboots. | ⬜ PENDING TEST |
+| **H3-B** | **Catastrophic Power Cut** | Power cut during write transaction $\rightarrow$ WAL replayed on reboot $\rightarrow$ `fsck` passes. | Zero filesystem corruption after dirty reboot. | ⬜ PENDING TEST |
 | **H4** | **Desktop Reality** | Physical mouse pointer drag, resize, multi-window z-order arbitration, focus fallback. | Multi-window interaction without compositor or kernel panic. | ⬜ PENDING TEST |
 
 ---
 
-## 🏆 Final Phase H Assessment
+## 📝 Hardware Failure Investigation Log Template
+
+When an anomaly or failure occurs on bare metal, log it using this standardized schema:
+
+```text
+Gate:               [H1 / H2 / H3-A / H3-B / H4]
+Target Hardware:    [Machine Model / Motherboard]
+Firmware:           [BIOS / CSM / UEFI Vendor & Version]
+CPU:                [Processor Model]
+RAM:                [Memory Size & Configuration]
+GPU / Display:      [Graphics Adapter & Resolution]
+Storage Media:      [USB Flash Drive Model / Interface]
+Input Devices:      [Keyboard / Mouse Models]
+
+Git Commit:         ff5a508
+Image SHA-256:      298587EF635AB5C67429F55F7AACB1A29500FB9F727B0BC18F69299EC6CD3CAC
+
+Expected Behavior:  [Exact expected outcome]
+Observed Behavior:  [Exact observed output or symptom]
+Last Known State:   [Last log line or visual state reached]
+
+Result:             [ FAIL / BLOCKED ]
+Failure Signature:  [Brief technical summary of failure]
+Kernel Output:      [Serial / Screen message transcript]
+
+Reproduction Steps:
+1. Boot from USB Flash Drive
+2. Select Legacy Boot
+3. Observe state at timestamp X
+
+Suspected Layer:
+[ ] Firmware Incompatibility
+[ ] Bootloader Stage 1/2
+[ ] Microkernel Ring 0
+[ ] Hardware Driver / Discovery
+[ ] Userspace Daemon (Ring 3)
+[ ] Hardware Controller Glitch
+
+Next Investigation & Remediation:
+[Actionable engineering steps]
+```
+
+---
+
+## 🏆 Phase H Final Verification Dashboard
 
 ```
-PHASE H BARE-METAL EVALUATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-H1: BOOT REALITY         [ PENDING / VERIFIED ]
-H2: INPUT REALITY        [ PENDING / VERIFIED ]
-H3: STORAGE REALITY      [ PENDING / VERIFIED ]
-H4: DESKTOP REALITY      [ PENDING / VERIFIED ]
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PHYSICAL MACHINE STATUS: [ PENDING BARE-METAL RUN ]
+============================================================
+              CATALYST OS — PHASE H VALIDATION
+============================================================
+H0  PREFLIGHT FREEZE      : 🟢 PASS
+H1  BOOT REALITY          : ⬜ PENDING TEST
+H2  INPUT REALITY         : ⬜ PENDING TEST
+H3  STORAGE (A & B)       : ⬜ PENDING TEST
+H4  DESKTOP REALITY       : ⬜ PENDING TEST
+------------------------------------------------------------
+PHASE H BARE-METAL STATUS : ⬜ NOT YET VERIFIED
+============================================================
 ```
 
-> **Invariant:** A single `FAIL` on any gate indicates that Phase H has not been cleared and requires kernel/driver triage.
+> **Invariant:** A single `FAIL` on any gate indicates that Phase H is incomplete and requires targeted driver/firmware resolution.
+
