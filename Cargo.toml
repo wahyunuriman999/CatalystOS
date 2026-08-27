@@ -21,6 +21,8 @@ members = [
     "userland/workspaced",
     "userland/clipboardd",
     "userland/terminal",
+    "userland/antigravity",
+    "userland/chrome",
 ]
 
 [workspace.package]

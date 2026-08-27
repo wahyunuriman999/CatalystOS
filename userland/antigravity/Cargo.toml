@@ -1,0 +1,13 @@
+[package]
+name = "antigravity"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+libcatalyst = { path = "../libcatalyst" }
+
+[[bin]]
+name = "antigravity"
+path = "src/main.rs"
+test = false
+bench = false

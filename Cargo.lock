@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "antigravity"
+version = "1.0.0"
+dependencies = [
+ "libcatalyst",
+]
+
+[[package]]
 name = "bit_field"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -44,13 +51,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "chrome"
+version = "1.0.0"
+dependencies = [
+ "libcatalyst",
+]
+
+[[package]]
+name = "clipboardd"
+version = "0.1.0"
+dependencies = [
+ "libcatalyst",
+]
+
+[[package]]
 name = "const_fn"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "413d67b29ef1021b4d60f4aa1e925ca031751e213832b4b1d588fae623c05c60"
 
 [[package]]
+name = "cpkg"
+version = "0.1.0"
+dependencies = [
+ "libcatalyst",
+]
+
+[[package]]
+name = "demo_app"
+version = "0.1.0"
+dependencies = [
+ "libcatalyst",
+]
+
+[[package]]
+name = "displayd"
+version = "0.1.0"
+dependencies = [
+ "libcatalyst",
+]
+
+[[package]]
 name = "hello"
+version = "0.1.0"
+dependencies = [
+ "libcatalyst",
+]
+
+[[package]]
+name = "inputd"
 version = "0.1.0"
 dependencies = [
  "libcatalyst",
@@ -100,6 +149,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f102c477fd4ec864c149803bf606ecc23bc9329602ec0f99073a728abf454abc"
 
 [[package]]
+name = "objectd"
+version = "0.1.0"
+dependencies = [
+ "libcatalyst",
+]
+
+[[package]]
 name = "pc-keyboard"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -136,6 +192,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
+name = "sessiond"
+version = "0.1.0"
+dependencies = [
+ "libcatalyst",
+]
+
+[[package]]
+name = "sh"
+version = "0.1.0"
+dependencies = [
+ "libcatalyst",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -154,6 +224,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "terminal"
+version = "0.1.0"
+dependencies = [
+ "libcatalyst",
+]
+
+[[package]]
 name = "uart_16550"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -169,6 +246,13 @@ name = "volatile"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "442887c63f2c839b346c192d047a7c87e73d0689c9157b00b53dcc27dd5ea793"
+
+[[package]]
+name = "workspaced"
+version = "0.1.0"
+dependencies = [
+ "libcatalyst",
+]
 
 [[package]]
 name = "x86"
