@@ -22,6 +22,8 @@ pub mod storage;
 pub mod net;
 pub mod init;
 pub mod security;
+pub mod objects;
+pub mod workspace;
 
 use bootloader_api::{entry_point, BootInfo};
 
