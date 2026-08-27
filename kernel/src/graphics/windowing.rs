@@ -215,6 +215,10 @@ impl WindowManager {
         }
     }
 
+    pub fn get_window(&self, wid: WindowId) -> Option<&Window> {
+        self.windows[wid.0 as usize].as_ref()
+    }
+
     pub fn update_cursor(&mut self, x: i32, y: i32, width: i32, height: i32) {
         // P2C-CURSOR-01: Old + New Cursor Invalidation
         let old_cursor = self.cursor_rect;
