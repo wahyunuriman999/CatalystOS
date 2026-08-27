@@ -17,7 +17,7 @@ echo "=========================================="
 
 # 1. Build Userland Programs
 echo "[1/3] Building Userland Programs (hello, sh, sessiond, displayd, inputd, demo_app, cpkg)..."
-USERLAND_PROJECTS=("hello" "sh" "sessiond" "displayd" "inputd" "demo_app" "cpkg" "objectd" "workspaced")
+USERLAND_PROJECTS=("hello" "sh" "sessiond" "displayd" "inputd" "demo_app" "cpkg" "objectd" "workspaced" "clipboardd" "terminal")
 for proj in "${USERLAND_PROJECTS[@]}"; do
     echo "  -> Building userland/$proj..."
     cd "$WORKSPACE_ROOT/userland/$proj"

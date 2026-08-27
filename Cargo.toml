@@ -19,6 +19,8 @@ members = [
     "userland/cpkg",
     "userland/objectd",
     "userland/workspaced",
+    "userland/clipboardd",
+    "userland/terminal",
 ]
 
 [workspace.package]
