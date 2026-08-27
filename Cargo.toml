@@ -17,6 +17,8 @@ members = [
     "userland/inputd",
     "userland/demo_app",
     "userland/cpkg",
+    "userland/objectd",
+    "userland/workspaced",
 ]
 
 [workspace.package]

@@ -1,0 +1,13 @@
+[package]
+name = "workspaced"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libcatalyst = { path = "../libcatalyst" }
+
+[[bin]]
+name = "workspaced"
+path = "src/main.rs"
+test = false
+bench = false

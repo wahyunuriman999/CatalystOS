@@ -15,7 +15,7 @@ $WorkspaceRoot = (Get-Item $PSScriptRoot).Parent.FullName
 # 1. Build Userland Applications
 Write-Host "`n[1/3] Building Userland Programs (hello, sh, sessiond, displayd, inputd, demo_app, cpkg)..." -ForegroundColor Yellow
 
-$UserlandProjects = @("hello", "sh", "sessiond", "displayd", "inputd", "demo_app", "cpkg")
+$UserlandProjects = @("hello", "sh", "sessiond", "displayd", "inputd", "demo_app", "cpkg", "objectd", "workspaced")
 foreach ($proj in $UserlandProjects) {
     Write-Host "  -> Building userland/$proj..."
     Push-Location "$WorkspaceRoot\userland\$proj"
