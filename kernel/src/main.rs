@@ -29,15 +29,39 @@ use bootloader_api::{entry_point, BootInfo};
 
 pub static BOOTLOADER_CONFIG: bootloader_api::BootloaderConfig = {
     let mut config = bootloader_api::BootloaderConfig::new_default();
+    // Dynamic: bootloader picks a free PML4 slot at runtime.
+    // This proved to get past "Map physical memory" + "Map page table recursively" in QEMU.
     config.mappings.physical_memory = Some(bootloader_api::config::Mapping::Dynamic);
     config.mappings.page_table_recursive = Some(bootloader_api::config::Mapping::Dynamic);
     config
 };
 
+
 entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
 
 fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
+    // CRITICAL: disable ALL interrupts IMMEDIATELY.
+    // The bootloader's IDT (at a UEFI virtual address) is NOT mapped in the kernel page table.
+    // Any hardware interrupt (e.g. timer 0x20) before we install our own IDT will cause
+    // a triple fault because the CPU cannot fetch the IDT entry.
+    unsafe { core::arch::asm!("cli", options(nomem, nostack)); }
+
+    // Install a minimal IDT so that any future exceptions are caught, not silently triple-faulted.
+    // arch::init() will replace this with the full IDT later.
+    crate::arch::early_idt_init();
+
+    // BOOT MILESTONE: write directly to port 0xe9 (QEMU debugcon) BEFORE any init
+    unsafe {
+        let mut p = x86_64::instructions::port::PortWriteOnly::<u8>::new(0xe9);
+        for b in b"[BOOT 08] kernel_main entered\r\n" { p.write(*b); }
+    }
+
     console::init();
+
+    unsafe {
+        let mut p = x86_64::instructions::port::PortWriteOnly::<u8>::new(0xe9);
+        for b in b"[BOOT 09] serial initialized\r\n" { p.write(*b); }
+    }
     crate::kprintln!("SERIAL INITIALIZED!");
     
     // Extract framebuffer info FIRST before passing boot_info to memory::init
@@ -58,16 +82,40 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     }
     crate::kprintln!("VGA INITIALIZED!");
 
+    unsafe {
+        let mut p = x86_64::instructions::port::PortWriteOnly::<u8>::new(0xe9);
+        for b in b"[BOOT 10] vga initialized\r\n" { p.write(*b); }
+    }
+
     crate::kprintln!("Initializing memory...");
+    unsafe {
+        let mut p = x86_64::instructions::port::PortWriteOnly::<u8>::new(0xe9);
+        for b in b"[BOOT 11] calling memory::init\r\n" { p.write(*b); }
+    }
     memory::init(boot_info);
+
+    unsafe {
+        let mut p = x86_64::instructions::port::PortWriteOnly::<u8>::new(0xe9);
+        for b in b"[BOOT 12] memory initialized\r\n" { p.write(*b); }
+    }
     
     crate::kprintln!("Initializing architecture (GDT, IDT, PICs)...");
     arch::init();
+
+    unsafe {
+        let mut p = x86_64::instructions::port::PortWriteOnly::<u8>::new(0xe9);
+        for b in b"[BOOT 13] arch (GDT/IDT) initialized\r\n" { p.write(*b); }
+    }
 
     storage::init();
     net::init_net();
     init::start_init_process();
     security::init_security();
+    
+    unsafe {
+        let mut p = x86_64::instructions::port::PortWriteOnly::<u8>::new(0xe9);
+        for b in b"[BOOT 14] services initialized\r\n" { p.write(*b); }
+    }
     
     crate::kprintln!("---------- M6: Catalyst GUI Desktop ----------");
     if let Some(info) = fb_info {
